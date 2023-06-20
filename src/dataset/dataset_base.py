@@ -196,7 +196,7 @@ class Dataset(ABC):
                 inst.graph = g
             elif graph_format == 'dgl':
                 # Reading the graph from the dgl dump
-                i_graph_path = os.path.join(i_path, i_name + '_graph_dgl.bin')
+                i_path_graph = os.path.join(i_path, i_name + '_graph_dgl.bin')
                 g = load_graphs(i_path_graph)[0]
                 inst.graph_dgl = g
                 inst.graph = dgl.to_networkx(g)
