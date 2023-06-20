@@ -1,3 +1,4 @@
+from src.dataset.dynamic_graphs.dataset_coauthorship_dblp import CoAuthorshipDBLP
 from src.dataset.dataset_imbd import IMDBDataset
 from src.dataset.dataset_hiv import HIVDataset
 from src.dataset.dataset_bbbp import BBBPDataset
@@ -132,10 +133,49 @@ class DatasetFactory():
             self_loops = params_dict.get('self_loops', False)
             return self.get_imdb(self_loops, dataset_dict)
         
+        elif dataset_name == 'coauthorship_dblp':
+            if not 'begin_time' in params_dict:
+                raise ValueError('"begin_time" is mandatory for CoAuthorshipDBLP')
+            if not 'end_time' in params_dict:
+                raise ValueError('"end_time" is mandatory for CoAuthorshipDBLP')
+            
+            begin_time = params_dict['begin_time']
+            end_time = params_dict['end_time']
+            
+            assert (begin_time < end_time)
+            
+            min_connections = params_dict.get('min_connections', 3)
+            percentile = params_dict.get('percentile', 75)
+        
+            return self.get_coauthorship_dblp(begin_time, end_time, min_connections, percentile, dataset_dict)
+        
         # If the dataset name does not match any of the datasets provided by the factory
         else:
             raise ValueError('''The provided dataset name is not valid. Valid names include: tree-cycles,
              tree-cycles-balanced, tree-cycles-dummy''')
+            
+            
+    def get_coauthorship_dblp(self, begin_time, end_time, min_conenctions=3, percentile=75, dataset_dict=None):
+        result = CoAuthorshipDBLP(self._dataset_id_counter,
+                                  begin_time=begin_time,
+                                  end_time=end_time,
+                                  min_connections=min_conenctions,
+                                  percentile=percentile,
+                                  config_dict=dataset_dict)
+        
+        self._dataset_id_counter += 1
+        ds_name = 'coauthorship_dblp'
+        ds_uri = os.path.join(self._data_store_path, 'drift_data', ds_name, 'processed')
+        ds_exists = os.path.exists(ds_uri)
+        
+        if ds_exists:
+            result.read_datasets(ds_uri)
+        else:
+            result.read_csv_file(os.path.join(self._data_store_path, 'drift_data', ds_name))
+            result.build_temporal_graph()
+            result.write_datasets(ds_uri)
+            
+        return result
 
     def get_imbd(self, self_loops=False, config_dict=None):
         result = IMDBDataset(self._dataset_id_counter, self_loops=self_loops, config_dict=config_dict)

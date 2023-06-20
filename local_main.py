@@ -7,7 +7,7 @@ print(f"Initializing test ensemble")
 
 # config_file_path = './config/steel/meg-set-1/config_tree-cycles-500-32_tc-custom-oracle_meg_fold-0.json'
 # config_file_path = './config/steel/cf2-bbbp/config_bbbp_gcn-tf_cf2_fold-9.json'
-config_file_path = './config/steel/clear-bbbp/config_bbbp_gcn-tf_clear_fold-0.json'
+config_file_path = './config/steel/simple_dblp/config_dblp_fold-0.json'
 
 print('Creating the evaluation manager.......................................................')
 eval_manager = EvaluatorManager(config_file_path, run_number=4)
@@ -18,7 +18,7 @@ eval_manager = EvaluatorManager(config_file_path, run_number=4)
 print('Creating the evaluators...................................................................')
 eval_manager.create_evaluators()
 print('Evaluating the explainers..................................................................')
-eval_manager.evaluate()
+#eval_manager.evaluate()
 
 
 # for ds in ["1", "4", "5"]:

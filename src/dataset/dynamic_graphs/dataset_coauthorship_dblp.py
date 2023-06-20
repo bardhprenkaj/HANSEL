@@ -12,11 +12,18 @@ from typing import Dict, List
 
 class CoAuthorshipDBLP(DynamicDataset):
     
-    def __init__(self, id, begin_t, end_t, k=3, perc=75, config_dict=None) -> None:
-        super().__init__(id, begin_t, end_t, config_dict)
+    def __init__(self,
+                 id,
+                 begin_time,
+                 end_time,
+                 min_connections=3,
+                 percentile=75,
+                 config_dict=None) -> None:
+        
+        super().__init__(id, begin_time, end_time, config_dict)
         self.name = 'coauthorship_dblp'
-        self.k = k
-        self.perc = perc        
+        self.min_connections = min_connections
+        self.percentile = percentile        
         
     def read_csv_file(self, dataset_path):
         # read the number of vertices in for each simplex
@@ -57,7 +64,7 @@ class CoAuthorshipDBLP(DynamicDataset):
         result = []
 
         for i, sublist in enumerate(C):
-            if len(sublist) >= self.k:
+            if len(sublist) >= self.min_connections:
                 result.append(np.array(sublist))
                 indices.append(i)
 
@@ -120,7 +127,7 @@ class CoAuthorshipDBLP(DynamicDataset):
     
     
     def __in_percentile(self, average_weights: Dict[int, float]) -> List[int]:
-        percentile_value = np.percentile(list(average_weights.values()), self.perc)
+        percentile_value = np.percentile(list(average_weights.values()), self.percentile)
         return [1 if num >= percentile_value else 0 for num in average_weights]
     
     
