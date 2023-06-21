@@ -174,7 +174,7 @@ class EvaluatorManager:
                 # The get_oracle_by_name method returns a fitted oracle
                 oracle = self._oracle_factory.get_oracle_by_name(oracle_dict, dataset, self._embedder_factory)
                 self.oracles.append(oracle)
-
+                
         # The goal of this method is to train the oracles and store them on disk to use them later
         # For this reason we clean the datasets and oracles lists after using them
         self.datasets = []

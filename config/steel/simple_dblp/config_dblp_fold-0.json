@@ -12,12 +12,26 @@
             "parameters": {
                 "begin_time": 2000,
                 "end_time": 2003,
-                "sampling_ratio": 0.05
+                "sampling_ratio": 0.001,
+                "percentile": 75
             } 
         }
     ],
     "oracles": [
-        {"name": "gcn-tf", "parameters": {} }
+        {
+            "name": "dynamic_oracle",
+            "parameters": {
+                "base_oracle" : {
+                    "name": "dblp_coauthorship_custom_oracle", 
+                    "parameters": {
+                        "fit": false,
+                        "percentile": 75
+                    } 
+                },
+                "first_train_timestamp": 2002
+            }
+            
+        }
     ],
     "explainers": [
         {

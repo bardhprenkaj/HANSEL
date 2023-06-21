@@ -2,9 +2,6 @@ import os
 from abc import ABC, abstractmethod
 from typing import Dict, List
 
-import networkx as nx
-import pandas as pd
-
 from src.dataset.dataset_base import Dataset
 
 
@@ -15,16 +12,23 @@ class DynamicDataset(ABC):
 
         assert (begin_t < end_t)
         
-        self.id = id
-        self.name = 'dynamic_graph_dataset'
+        self._id = id
+        self._name = 'dynamic_graph_dataset'
 
         self.begin_t = begin_t
         self.end_t = end_t
         
-        self.dynamic_graph:Dict[Dataset] = { 
-                                            key: Dataset(key % self.begin_t, config_dict=config_dict)\
+        self.dynamic_graph:Dict[int, Dataset] = { 
+                                            key: Dataset(key, config_dict=config_dict)\
                                                 for key in range(self.begin_t, self.end_t + 1) 
                                             }
+        
+        self.splits = {
+            key: None for key in range(self.begin_t, self.end_t + 1)
+        }
+        
+        self._instance_id_counter = len(self.dynamic_graph)
+        self._config_dict = config_dict
         
     @abstractmethod
     def build_temporal_graph(self):
@@ -32,11 +36,25 @@ class DynamicDataset(ABC):
     
     def read_datasets(self, dataset_path, graph_format='edge_list'):
         for key, dataset in self.dynamic_graph.items():
-            self.dynamic_graph[key] = dataset.read_data(os.path.join(dataset_path, key), graph_format=graph_format)
+            dataset.read_data(os.path.join(dataset_path, f'DBLP@{key}'), graph_format=graph_format)
     
     def write_datasets(self, dataset_path, graph_format='edge_list'):
+        if not os.path.exists(dataset_path):
+            os.makedirs(dataset_path)
+                    
+        for dataset in self.dynamic_graph.values():
+            dataset.write_data(dataset_path, graph_format=graph_format)
+            
+            
+    def load_or_generate_splits(self, dataset_folder, n_splits=10, shuffle=True):
         for key, dataset in self.dynamic_graph.items():
-            dataset.write_data(os.path.join(dataset_path, key), graph_format=graph_format)
+            dataset_path = os.path.join(dataset_folder, 'processed', dataset._name)
+            if not os.path.exists(dataset_path):
+                os.makedirs(dataset_path)
+            splits_uri = os.path.join(dataset_path)
+            self.splits[key] = dataset.load_or_generate_splits(splits_uri,
+                                                               n_splits=n_splits,
+                                                               shuffle=shuffle)
         
     @abstractmethod
     def preprocess_datasets(self):

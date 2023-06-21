@@ -28,6 +28,8 @@ class CoAuthorshipDBLP(DynamicDataset):
         self.percentile = percentile
         self.sampling_ratio = sampling_ratio
         
+        print(self.dynamic_graph)
+        
         random.seed(seed)       
         
     def read_csv_file(self, dataset_path):
@@ -106,24 +108,26 @@ class CoAuthorshipDBLP(DynamicDataset):
         
         print('Converting all networkx to DataInstance objects...')
         for i in range(begin, end + 1):
-            print(f'Working for year={begin}')
-            self.dynamic_graph[i % begin]._name = f'DBLP@{i}'
+            print(f'Working for year={i}')
+            self.dynamic_graph[i]._name = f'DBLP@{i}'
             labels = self.__get_labels(aligned_graphs_in_time, i)
+            print(labels)
             for node in aligned_graphs_in_time[begin].nodes():
                 ego_net = nx.ego_graph(aligned_graphs_in_time[i], node)
-                
-                instance = DataInstanceWFeaturesAndWeights(node)
-                instance.weights(nx.to_numpy_array(ego_net))
-                instance.graph = nx.to_numpy_array(ego_net, weight=None)
+                                
+                instance = DataInstanceWFeaturesAndWeights(id=node)
+                instance.name = f'ego_network_for_node={node}'
+                instance.weights = nx.to_numpy_array(ego_net)
+                instance.graph = ego_net
                 instance.graph_label = labels[node]
                 
                 print(f'Adding DataInstance with id = {node}')
-                self.dynamic_graph[i % begin].instances.append(instance)
+                self.dynamic_graph[i].instances.append(instance)
                 
         print('Eliminating the empty snapshots')
         # clear those snapshots that are empty
         for i in range(self.begin_t, self.end_t + 1):
-            if self.dynamic_graph[i % self.begin_t].get_data_len() == 0:
+            if self.dynamic_graph[i].get_data_len() == 0:
                 self.dynamic_graph.pop(i % self.begin_t, None)
                 
         print(f'Finished preprocessing.')
@@ -153,10 +157,9 @@ class CoAuthorshipDBLP(DynamicDataset):
         self.unprocessed_data[begin] = subgraph
 
     
-    def __in_percentile(self, average_weights: Dict[int, float]) -> List[int]:
+    def __in_percentile(self, average_weights: Dict[int, float]) -> Dict[int, int]:
         percentile_value = np.percentile(list(average_weights.values()), self.percentile)
-        return [1 if num >= percentile_value else 0 for num in average_weights]
-    
+        return {key: 1 if value > percentile_value else 0 for key, value in average_weights.items()}
     
     def __get_labels(self, temporal_graph, year) -> Dict[int, int]:
         assert (year <= max(temporal_graph.keys()))
@@ -166,10 +169,9 @@ class CoAuthorshipDBLP(DynamicDataset):
         for node in temporal_graph[begin].nodes():
             ego = nx.ego_graph(temporal_graph[year], node)
             weights = list(nx.get_edge_attributes(ego, 'weight').values())
-            weight_dict[node] = np.mean(weights)
+            weight_dict[node] = np.mean(weights) if len(weights) > 0 else 0
             
-        return dict(zip(temporal_graph[begin].nodes(),
-                        self.__in_percentile(weight_dict)))
+        return  self.__in_percentile(weight_dict)
 
     
         

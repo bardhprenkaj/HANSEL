@@ -76,7 +76,8 @@ class Dataset(ABC):
         """
         # Creating a folder to contain the dataset
         dataset_path = os.path.join(datasets_folder_path, self._name)
-        os.mkdir(dataset_path)
+        if not os.path.exists(dataset_path):
+            os.mkdir(dataset_path)
 
         # Creating a file to contain the name of the dataset
         with open(os.path.join(dataset_path, 'dataset_name.txt'), 'w') as ds_name_writer:
@@ -98,7 +99,8 @@ class Dataset(ABC):
 
             # Creating a folder to contain the files associated with the instance
             i_path = os.path.join(dataset_path, i_name)
-            os.mkdir(i_path)
+            if not os.path.exists(i_path):
+                os.mkdir(i_path)
 
             if graph_format == 'edge_list':
                 # Writing the instance graph into edgelist format
@@ -313,7 +315,7 @@ class Dataset(ABC):
     
     def load_or_generate_splits(self, dataset_folder, n_splits=10, shuffle=True):
 
-         # Reading the splits of the dataset
+        # Reading the splits of the dataset
         splits_uri = os.path.join(dataset_folder, 'splits.json')
         if os.path.exists(splits_uri):
             with open(splits_uri, 'r') as split_reader:

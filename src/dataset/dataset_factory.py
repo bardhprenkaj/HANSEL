@@ -181,9 +181,14 @@ class DatasetFactory():
         
         if ds_exists:
             result.read_datasets(ds_uri)
+            
+            print("Finished reading")
+            print(result.dynamic_graph[2000].instances)
         else:
-            result.read_csv_file(os.path.join(self._data_store_path, 'drift_data', ds_name))
+            result.read_csv_file(os.path.join(self._data_store_path, 'dynamic_graphs', ds_name))
             result.build_temporal_graph()
+            result.load_or_generate_splits(os.path.join(self._data_store_path, 'dynamic_graphs', ds_name),
+                                           n_splits=10, shuffle=True)
             result.write_datasets(ds_uri)
             
         return result
