@@ -96,14 +96,17 @@ class CoAuthorshipDBLP(DynamicDataset):
                 
                 
     def preprocess_datasets(self):
-        print("Preprocessing began")
+        print("Preprocessing began...")
         self.__sample_on_first_graph()
-        print("Tracing ego networks")
+        print("Tracing ego networks...")
         aligned_graphs_in_time = self.__trace_ego_networks(self.unprocessed_data)
         begin = min(aligned_graphs_in_time.keys())
         end = max(aligned_graphs_in_time.keys())
+        print('Finished tracing ego networks')
         
+        print('Converting all networkx to DataInstance objects...')
         for i in range(begin, end + 1):
+            print(f'Working for year={begin}')
             self.dynamic_graph[i % begin]._name = f'DBLP@{i}'
             labels = self.__get_labels(aligned_graphs_in_time, i)
             for node in aligned_graphs_in_time[begin].nodes():
@@ -114,12 +117,16 @@ class CoAuthorshipDBLP(DynamicDataset):
                 instance.graph = nx.to_numpy_array(ego_net, weight=None)
                 instance.graph_label = labels[node]
                 
+                print(f'Adding DataInstance with id = {node}')
                 self.dynamic_graph[i % begin].instances.append(instance)
                 
+        print('Eliminating the empty snapshots')
         # clear those snapshots that are empty
         for i in range(self.begin_t, self.end_t + 1):
             if self.dynamic_graph[i % self.begin_t].get_data_len() == 0:
                 self.dynamic_graph.pop(i % self.begin_t, None)
+                
+        print(f'Finished preprocessing.')
                 
                 
     def __trace_ego_networks(self, temporal_graph):
@@ -127,11 +134,12 @@ class CoAuthorshipDBLP(DynamicDataset):
         end = max(temporal_graph.keys())
         
         for node in temporal_graph[begin].nodes():
+            print(f'Working for node = {node} on ego network tracing...')
             for i in range(begin + 1, end + 1):
                 if node not in temporal_graph[i].nodes():
                     temporal_graph[i] = nx.compose(temporal_graph[i],
                                                    nx.ego_graph(temporal_graph[i-1], node))
-                    
+            print(f'Finished tracing for node = {node}')
         return temporal_graph
     
     
