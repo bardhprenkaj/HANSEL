@@ -18,7 +18,7 @@ class CoAuthorshipDBLP(DynamicDataset):
                  end_time,
                  min_connections=3,
                  percentile=75,
-                 sample_nodes=.25,
+                 sampling_ratio=.25,
                  seed=42,
                  config_dict=None) -> None:
         
@@ -26,7 +26,7 @@ class CoAuthorshipDBLP(DynamicDataset):
         self.name = 'coauthorship_dblp'
         self.min_connections = min_connections
         self.percentile = percentile
-        self.sample_nodes = sample_nodes
+        self.sampling_ratio = sampling_ratio
         
         random.seed(seed)       
         
@@ -137,7 +137,7 @@ class CoAuthorshipDBLP(DynamicDataset):
     
     def __sample_on_first_graph(self):
         begin = min(self.unprocessed_data.keys())
-        num_nodes_to_keep = int(self.sample_nodes * self.unprocessed_data[begin].number_of_nodes())
+        num_nodes_to_keep = int(self.sampling_ratio * self.unprocessed_data[begin].number_of_nodes())
         
         print(f'Number of nodes to keep = {num_nodes_to_keep}')
         nodes_to_keep = random.sample(self.unprocessed_data[begin].nodes(), num_nodes_to_keep)

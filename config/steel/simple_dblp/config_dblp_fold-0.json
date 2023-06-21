@@ -11,7 +11,8 @@
             "name": "coauthorship_dblp", 
             "parameters": {
                 "begin_time": 2000,
-                "end_time": 2003
+                "end_time": 2003,
+                "sampling_ratio": 0.05
             } 
         }
     ],
