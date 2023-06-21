@@ -7,7 +7,7 @@ import networkx as nx
 import numpy as np
 import os
 import pandas as pd
-
+import random
 from typing import Dict, List
 
 class CoAuthorshipDBLP(DynamicDataset):
@@ -18,12 +18,17 @@ class CoAuthorshipDBLP(DynamicDataset):
                  end_time,
                  min_connections=3,
                  percentile=75,
+                 sample_nodes=.25,
+                 seed=42,
                  config_dict=None) -> None:
         
         super().__init__(id, begin_time, end_time, config_dict)
         self.name = 'coauthorship_dblp'
         self.min_connections = min_connections
-        self.percentile = percentile        
+        self.percentile = percentile
+        self.sample_nodes = sample_nodes
+        
+        random.seed(seed)       
         
     def read_csv_file(self, dataset_path):
         # read the number of vertices in for each simplex
@@ -68,12 +73,13 @@ class CoAuthorshipDBLP(DynamicDataset):
                 result.append(np.array(sublist))
                 indices.append(i)
 
-        return np.array(result), indices
+        return np.array(result, dtype=object), indices
     
     
     def build_temporal_graph(self):
         self.unprocessed_data = {}
         for row in self.grouped_by_time:
+            print(f'Working for time={row[0]}')
             G = nx.Graph()
             for graph in row[1]['graph'].to_numpy():
                 G.add_nodes_from(graph)
@@ -90,6 +96,9 @@ class CoAuthorshipDBLP(DynamicDataset):
                 
                 
     def preprocess_datasets(self):
+        print("Preprocessing began")
+        self.__sample_on_first_graph()
+        print("Tracing ego networks")
         aligned_graphs_in_time = self.__trace_ego_networks(self.unprocessed_data)
         begin = min(aligned_graphs_in_time.keys())
         end = max(aligned_graphs_in_time.keys())
@@ -125,6 +134,16 @@ class CoAuthorshipDBLP(DynamicDataset):
                     
         return temporal_graph
     
+    
+    def __sample_on_first_graph(self):
+        begin = min(self.unprocessed_data.keys())
+        num_nodes_to_keep = int(self.sample_nodes * self.unprocessed_data[begin].number_of_nodes())
+        
+        print(f'Number of nodes to keep = {num_nodes_to_keep}')
+        nodes_to_keep = random.sample(self.unprocessed_data[begin].nodes(), num_nodes_to_keep)
+        subgraph = self.unprocessed_data[begin].subgraph(nodes_to_keep)
+        self.unprocessed_data[begin] = subgraph
+
     
     def __in_percentile(self, average_weights: Dict[int, float]) -> List[int]:
         percentile_value = np.percentile(list(average_weights.values()), self.percentile)
