@@ -335,4 +335,7 @@ class Dataset(ABC):
             yield graph, activity
 
     def num_classes(self):
-        return len(np.unique([i.graph_label for i in self.instances]))
+        return len(self.get_classes())
+    
+    def get_classes(self):
+        return np.unique([i.graph_label for i in self.instances])

@@ -2,6 +2,7 @@ from src.dataset.converters.cf2_converter import CF2TreeCycleConverter
 from src.dataset.converters.weights_converter import \
     DefaultFeatureAndWeightConverter
 from src.evaluation.evaluation_metric_factory import EvaluationMetricFactory
+from src.explainer.dynamic_graphs.ada_gce import AdaptiveGCE
 from src.explainer.ensemble.ensemble_factory import EnsembleFactory
 from src.explainer.explainer_base import Explainer
 from src.explainer.explainer_bidirectional_search import (
@@ -13,15 +14,15 @@ from src.explainer.explainer_clear import CLEARExplainer
 from src.explainer.explainer_countergan import CounteRGANExplainer
 from src.explainer.explainer_dce_search import (DCESearchExplainer,
                                                 DCESearchExplainerOracleless)
+from src.explainer.explainer_incremental_rand import IRandExplainer
 from src.explainer.explainer_maccs import MACCSExplainer
 from src.explainer.explainer_perturbation_rand import PerturbationRandExplainer
-from src.explainer.meg.environments.bbbp_env import BBBPEnvironment
 from src.explainer.meg.environments.basic_policies import \
     AddRemoveEdgesEnvironment
+from src.explainer.meg.environments.bbbp_env import BBBPEnvironment
 from src.explainer.meg.explainer_meg import MEGExplainer
 from src.explainer.meg.utils.encoders import (
     IDActionEncoder, MorganBitFingerprintActionEncoder)
-from src.explainer.explainer_incremental_rand import IRandExplainer
 
 
 class ExplainerFactory:
@@ -274,10 +275,43 @@ class ExplainerFactory:
 
             return self.get_irand_explainer(fold_id=fold_id, perturbation_percentage=perturbation_percentage, 
                                             tries=tries, config_dict=explainer_dict)
+            
+        elif explainer_name == 'ada_gce':            
+            fold_id = explainer_parameters.get('fold_id', 0)
+            num_classes = explainer_parameters.get('num_classes', 2)
+            time = explainer_parameters.get('time', 0)
+            in_channels = explainer_parameters.get('in_channels', 1)
+            out_channels = explainer_parameters.get('out_channels', 64)
+            batch_size = explainer_parameters.get('batch_size', 24)
+            lr = explainer_parameters.get('lr', 1e-3)
+            epochs_ae = explainer_parameters.get('epochs_ae', 100)
+            epochs_siamese = explainer_parameters.get('epochs_siamses', 100)
+       
+            return self.get_ada_gce(fold_id, num_classes, time, in_channels, out_channels, batch_size,
+                                    lr, epochs_ae, epochs_siamese, config_dict=explainer_dict)
 
         else:
             raise ValueError('''The provided explainer name does not match any explainer provided 
             by the factory''')
+            
+            
+    def get_ada_gce(self, fold_id, num_classes, time, in_channels, out_channels, batch_size,
+                    lr, epochs_ae, epochs_siamese, config_dict=None):
+        
+        result = AdaptiveGCE(id=self._explainer_id_counter,
+                             fold_id=fold_id,
+                             num_classes=num_classes,
+                             time=time,
+                             in_channels=in_channels,
+                             out_channels=out_channels,
+                             batch_size=batch_size,
+                             lr=lr,
+                             epochs_ae=epochs_ae,
+                             epochs_siamese=epochs_siamese,
+                             config_dict=config_dict)
+        
+        self._explainer_id_counter += 1
+        return result
         
     def get_irand_explainer(self, fold_id, perturbation_percentage, tries, config_dict=None):
         result = IRandExplainer(id=self._explainer_id_counter, 

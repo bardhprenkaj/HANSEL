@@ -28,20 +28,15 @@
                         "percentile": 75
                     } 
                 },
-                "first_train_timestamp": 2002
+                "first_train_timestamp": 2000
             }
             
         }
     ],
     "explainers": [
         {
-            "name": "clear",
-            "parameters":{
-                "n_nodes": 269,
-                "n_labels": 2,
-                "fold_id": 0,
-                "epochs": 100
-            } 
+            "name": "ada_gce",
+            "parameters":{ } 
         }
     ],
     "evaluation_metrics": [ 

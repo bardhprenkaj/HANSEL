@@ -144,13 +144,11 @@ class DatasetFactory():
             
             assert (begin_time < end_time)
             
-            min_connections = params_dict.get('min_connections', 3)
             percentile = params_dict.get('percentile', 75)
             sampling_ratio = params_dict.get('sampling_ratio', .05)
         
             return self.get_coauthorship_dblp(begin_time,
                                               end_time,
-                                              min_connections,
                                               percentile,
                                               sampling_ratio,
                                               dataset_dict)
@@ -162,14 +160,12 @@ class DatasetFactory():
             
             
     def get_coauthorship_dblp(self, begin_time, end_time,
-                              min_conenctions=3,
                               percentile=75,
                               sampling_ratio=.05, dataset_dict=None):
         
         result = CoAuthorshipDBLP(self._dataset_id_counter,
                                   begin_time=begin_time,
                                   end_time=end_time,
-                                  min_connections=min_conenctions,
                                   percentile=percentile,
                                   sampling_ratio=sampling_ratio,
                                   config_dict=dataset_dict)

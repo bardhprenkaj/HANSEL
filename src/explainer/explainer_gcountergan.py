@@ -23,7 +23,6 @@ import os
 import numpy as np
 import json
 import math
-from sklearn.model_selection import train_test_split
 import torch.nn.functional as F
 import torch.nn as nn
 from torch_geometric.nn import GCNConv, GAE

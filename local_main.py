@@ -1,5 +1,6 @@
 
 import sys
+from src.evaluation.dynamic_graphs.dynamic_evaluator_manager import DynamicEvaluatorManager
 
 from src.evaluation.evaluator_manager import EvaluatorManager
 
@@ -10,7 +11,7 @@ print(f"Initializing test ensemble")
 config_file_path = './config/steel/simple_dblp/config_dblp_fold-0.json'
 
 print('Creating the evaluation manager.......................................................')
-eval_manager = EvaluatorManager(config_file_path, run_number=4)
+eval_manager = DynamicEvaluatorManager(config_file_path, run_number=4)
 # print('Generating Synthetic Datasets...........................................................')
 # eval_manager.generate_synthetic_datasets()
 print('Training the oracles......................................................................')

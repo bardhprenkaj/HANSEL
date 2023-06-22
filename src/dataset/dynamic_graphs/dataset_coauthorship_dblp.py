@@ -16,7 +16,6 @@ class CoAuthorshipDBLP(DynamicDataset):
                  id,
                  begin_time,
                  end_time,
-                 min_connections=3,
                  percentile=75,
                  sampling_ratio=.25,
                  seed=42,
@@ -24,12 +23,9 @@ class CoAuthorshipDBLP(DynamicDataset):
         
         super().__init__(id, begin_time, end_time, config_dict)
         self.name = 'coauthorship_dblp'
-        self.min_connections = min_connections
         self.percentile = percentile
         self.sampling_ratio = sampling_ratio
-        
-        print(self.dynamic_graph)
-        
+            
         random.seed(seed)       
         
     def read_csv_file(self, dataset_path):
@@ -41,11 +37,9 @@ class CoAuthorshipDBLP(DynamicDataset):
         simplices = simplices.values.squeeze().tolist()
         # group simplices according to the vertex number in vertices
         graphs = self.__group_simplices(vertices, simplices)
-        graphs, indices_remaining = self.__filter_small_simplices(graphs)
         # read the timestamps
         times = pd.read_csv(os.path.join(dataset_path, 'coauth-DBLP-times.txt'), sep=' ', header=None, names=['timestamp'])
         # take only those that have a large enough simplex
-        times = times.iloc[indices_remaining]
         
         times['graph'] = np.array(graphs)
         times = times.sort_values(by='timestamp')
