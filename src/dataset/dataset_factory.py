@@ -172,7 +172,7 @@ class DatasetFactory():
         
         self._dataset_id_counter += 1
         ds_name = 'coauthorship_dblp'
-        ds_uri = os.path.join(self._data_store_path, 'drift_data', ds_name, 'processed')
+        ds_uri = os.path.join(self._data_store_path, 'dynamic_graphs', ds_name, 'processed')
         ds_exists = os.path.exists(ds_uri)
         
         if ds_exists:
