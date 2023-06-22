@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import GAE, GCNConv
+from torch_geometric.utils import scatter
 
 from src.dataset.dataset_base import Dataset
 from src.dataset.torch_geometric.dataset_geometric import TorchGeometricDataset
@@ -19,6 +20,7 @@ class AdaptiveGCE(Explainer):
     
     def __init__(self,
                  id,
+                 explainer_store_path,
                  time=0,
                  num_classes=2,
                  in_channels=1,
@@ -28,6 +30,7 @@ class AdaptiveGCE(Explainer):
                  lr=1e-3,
                  epochs_ae=100,
                  epochs_siamese=100,
+                 device='cpu',
                  config_dict=None) -> None:
         super().__init__(id, config_dict)
         
@@ -37,16 +40,22 @@ class AdaptiveGCE(Explainer):
         self.batch_size = batch_size
         self.epochs_ae = epochs_ae
         self.epochs_siamese = epochs_siamese
+        self.device = device
         
         self.autoencoders = [
             GAE(encoder=GCNEncoder(
                 in_channels=in_channels,
-                out_channels=out_channels)) for _ in range(num_classes) 
+                out_channels=out_channels)).to(self.device) for _ in range(num_classes) 
         ]
         
         self.optimisers = [
             torch.optim.Adam(self.autoencoders[i].parameters(), lr=lr) for i in range(num_classes)
         ]
+        
+        self._fitted = False
+        
+        self.explainer_store_path = explainer_store_path
+
         
         
     def explain(self, instance, oracle: Oracle, dataset: Dataset):        
@@ -66,7 +75,7 @@ class AdaptiveGCE(Explainer):
         else:
             # Create the folder to store the oracle if it does not exist
             os.mkdir(explainer_uri)                    
-            self.__fit(oracle, dataset, fold_id)
+            self.__fit(oracle, dataset)
             # self.save_explainers()        
         # setting the flag to signal the explainer was already trained
         self._fitted = True    
@@ -78,20 +87,20 @@ class AdaptiveGCE(Explainer):
         
         for cls, data_loader in enumerate(data_loaders):
             optimiser = self.optimisers[cls]
-            autoencoder = self.autoencoders[cls]
+            autoencoder: GAE = self.autoencoders[cls]
             
             autoencoder.train()
             
             for epoch in range(self.epochs_ae):
                 
                 losses = []
-                for edge_index, edge_attr, _ in data_loader:
-                    edge_index = edge_index[1].squeeze(dim=0).to(self.device)
-                    edge_attr = edge_attr[1].squeeze(dim=0).to(self.device)
+                for item in data_loader:
+                    edge_index = item.edge_index.squeeze(dim=0).to(self.device)
+                    edge_attr = item.edge_attr.squeeze(dim=0).to(self.device)
                     
                     optimiser.zero_grad()
                     
-                    z = autoencoder(edge_index, edge_attr)
+                    z = autoencoder.encode(torch.FloatTensor([]), edge_index, edge_attr)
                     loss = autoencoder.recon_loss(z, edge_index)
                     
                     loss.backward()
@@ -112,10 +121,11 @@ class AdaptiveGCE(Explainer):
     
     def transform_data(self, dataset: Dataset) -> List[DataLoader]:
         adj  = torch.from_numpy(np.array([i.to_numpy_array() for i in dataset.instances]))
+        x = torch.from_numpy(np.array([i.features for i in dataset.instances]))
         y = torch.from_numpy(np.array([i.graph_label for i in dataset.instances]))
         
         indices = dataset.get_split_indices()[self.fold_id]['train'] 
-        adj, y = adj[indices], y[indices]
+        x, adj, y = x[indices], adj[indices], y[indices]
         
         classes = dataset.get_classes()
 
@@ -128,23 +138,22 @@ class AdaptiveGCE(Explainer):
             # get all non zero vectors. now the shape will be m x d
             # where m is the number of edges and 
             # d is the dimensionality of the edge weight vector
-            w = adj[i]
-                    
+            w = adj[i]                    
             # get the edge indices
             # shape m x 2
             a = torch.nonzero(adj[i])
             w = w[a[:,0], a[:,1]]
                     
-            data_dict_cls[y[i]].append(Data(y=y[i], edge_index=a.T, edge_attr=w))            
+            data_dict_cls[y[i].item()].append(Data(x=x[i], y=y[i], edge_index=a.T, edge_attr=w))            
         
         data_loaders = []
         for cls in data_dict_cls.keys():
             data_loaders.append(DataLoader(
-                TorchGeometricDataset(np.array(data_dict_cls[cls]),
-                                      batch_size=min(self.batch_size, len(data_dict_cls[cls])),
+                TorchGeometricDataset(data_dict_cls[cls]),
+                                      batch_size=1,
                                       shuffle=True,
                                       num_workers=2)
-            ))
+            )
         
         return data_loaders
         
@@ -160,15 +169,17 @@ class GCNEncoder(nn.Module):
         self.conv2 = GCNConv(out_channels, out_channels)
         self.conv3 = GCNConv(out_channels, in_channels)
         self.training = False
-
-    def forward(self, x, edge_index):
-        x = self.conv1(x, edge_index)
+        
+    def forward(self, x, edge_index, edge_weight):
+        print(x)
+        print(edge_index)
+        x = self.conv1(x=x, edge_index=edge_index, edge_weight=edge_weight)
         x = F.leaky_relu(x, negative_slope=.2)
         x = F.dropout(x, p=.2, training=self.training)
-        x = self.conv2(x, edge_index)
+        x = self.conv2(x=x, edge_index=edge_index, edge_weight=edge_weight)
         x = F.leaky_relu(x, negative_slope=.2)
         x = F.dropout(x, p=.2, training=self.training)
-        x = self.conv3(x, edge_index)
+        x = self.conv3(x=x, edge_index=edge_index, edge_weight=edge_weight)
         x = torch.tanh(x)
         return x
 

@@ -13,7 +13,9 @@
                 "begin_time": 2000,
                 "end_time": 2003,
                 "sampling_ratio": 0.001,
-                "percentile": 75
+                "percentile": 75,
+                "min_connections": 10
+
             } 
         }
     ],

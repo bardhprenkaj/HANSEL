@@ -28,7 +28,7 @@ class DynamicEvaluator(Evaluator):
     def evaluate(self):
         begin_time = min(self.dataset.dynamic_graph.keys())
         for time in self.dataset.dynamic_graph.keys():
-            self.explainer.time = time - begin_time
+            self._explainer.time = time - begin_time
             self._data = self.dataset.dynamic_graph[time]
             super().evaluate()                
                 

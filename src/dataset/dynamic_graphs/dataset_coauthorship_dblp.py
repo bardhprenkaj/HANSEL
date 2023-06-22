@@ -18,6 +18,7 @@ class CoAuthorshipDBLP(DynamicDataset):
                  end_time,
                  percentile=75,
                  sampling_ratio=.25,
+                 min_connections=5,
                  seed=42,
                  config_dict=None) -> None:
         
@@ -25,6 +26,7 @@ class CoAuthorshipDBLP(DynamicDataset):
         self.name = 'coauthorship_dblp'
         self.percentile = percentile
         self.sampling_ratio = sampling_ratio
+        self.min_connections = min_connections
             
         random.seed(seed)       
         
@@ -41,7 +43,9 @@ class CoAuthorshipDBLP(DynamicDataset):
         times = pd.read_csv(os.path.join(dataset_path, 'coauth-DBLP-times.txt'), sep=' ', header=None, names=['timestamp'])
         # take only those that have a large enough simplex
         
-        times['graph'] = np.array(graphs)
+        times['graph'] = np.array(graphs, dtype=object)
+        
+        print(times['graph'])
         times = times.sort_values(by='timestamp')
         # retain only desired history
         times = times[(times.timestamp >= self.begin_t) & (times.timestamp <= self.end_t)]
@@ -93,9 +97,9 @@ class CoAuthorshipDBLP(DynamicDataset):
                 
     def preprocess_datasets(self):
         print("Preprocessing began...")
-        self.__sample_on_first_graph()
+        #self.__sample_on_first_graph()
         print("Tracing ego networks...")
-        aligned_graphs_in_time = self.__trace_ego_networks(self.unprocessed_data)
+        aligned_graphs_in_time, nodes_to_consider = self.__trace_ego_networks(self.unprocessed_data)
         begin = min(aligned_graphs_in_time.keys())
         end = max(aligned_graphs_in_time.keys())
         print('Finished tracing ego networks')
@@ -105,13 +109,15 @@ class CoAuthorshipDBLP(DynamicDataset):
             print(f'Working for year={i}')
             self.dynamic_graph[i]._name = f'DBLP@{i}'
             labels = self.__get_labels(aligned_graphs_in_time, i)
-            print(labels)
-            for node in aligned_graphs_in_time[begin].nodes():
+            for node in nodes_to_consider:
                 ego_net = nx.ego_graph(aligned_graphs_in_time[i], node)
+                
+                print(f'edges = {len(ego_net.edges())} for node = {node}')
                                 
                 instance = DataInstanceWFeaturesAndWeights(id=node)
                 instance.name = f'ego_network_for_node={node}'
                 instance.weights = nx.to_numpy_array(ego_net)
+                instance.features = np.random.rand(8,1)
                 instance.graph = ego_net
                 instance.graph_label = labels[node]
                 
@@ -131,25 +137,33 @@ class CoAuthorshipDBLP(DynamicDataset):
         begin = min(temporal_graph.keys())
         end = max(temporal_graph.keys())
         
-        for node in temporal_graph[begin].nodes():
+        temporal_graph[begin] = self.__sample_nodes(temporal_graph[begin])
+        num_nodes_to_keep = int(self.sampling_ratio * temporal_graph[begin].number_of_nodes())
+        
+        nodes = list(temporal_graph[begin].nodes())
+        np.random.shuffle(nodes)
+        nodes = nodes[:num_nodes_to_keep]
+        print(f'Keeping {len(nodes)} nodes')
+        for node in nodes:
             print(f'Working for node = {node} on ego network tracing...')
             for i in range(begin + 1, end + 1):
                 if node not in temporal_graph[i].nodes():
-                    temporal_graph[i] = nx.compose(temporal_graph[i],
-                                                   nx.ego_graph(temporal_graph[i-1], node))
-            print(f'Finished tracing for node = {node}')
-        return temporal_graph
-    
-    
-    def __sample_on_first_graph(self):
-        begin = min(self.unprocessed_data.keys())
-        num_nodes_to_keep = int(self.sampling_ratio * self.unprocessed_data[begin].number_of_nodes())
-        
-        print(f'Number of nodes to keep = {num_nodes_to_keep}')
-        nodes_to_keep = random.sample(self.unprocessed_data[begin].nodes(), num_nodes_to_keep)
-        subgraph = self.unprocessed_data[begin].subgraph(nodes_to_keep)
-        self.unprocessed_data[begin] = subgraph
+                    ego = nx.ego_graph(temporal_graph[i-1], node)
+                    temporal_graph[i] = nx.compose(temporal_graph[i], ego)
 
+            print(f'Finished tracing for node = {node}')
+            
+        return temporal_graph, nodes
+    
+    def __sample_nodes(self, graph):
+        remaining_nodes = [
+            node if len(nx.ego_graph(graph, node).edges()) >= self.min_connections else None for node in graph.nodes() 
+        ]
+                
+        remaining_nodes = set(remaining_nodes)
+        remaining_nodes = remaining_nodes.difference(set([None]))
+            
+        return graph.subgraph(list(remaining_nodes))
     
     def __in_percentile(self, average_weights: Dict[int, float]) -> Dict[int, int]:
         percentile_value = np.percentile(list(average_weights.values()), self.percentile)

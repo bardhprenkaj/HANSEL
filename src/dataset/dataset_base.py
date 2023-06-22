@@ -1,6 +1,7 @@
 from typing_extensions import Self
 
 from sqlalchemy import false
+from src.dataset.data_instance_features import DataInstanceWFeatures
 from src.dataset.data_instance_base import DataInstance
 
 from abc import ABC, abstractmethod
@@ -139,6 +140,11 @@ class Dataset(ABC):
             if i.minimum_counterfactual_distance is not None:
                 with open(os.path.join(i_path, i_name + '_mcd.json'), 'w') as mcd_writer:
                     mcd_writer.write(jsonpickle.encode(i.minimum_counterfactual_distance))
+                    
+                    
+            if i.features is not None:
+                with open(os.path.join(i_path, i_name + '_features.json'), 'w') as feature_writer:
+                    feature_writer.write(jsonpickle.encode(i.features))
 
         # Writing the splits into file in json format
         if self.splits is not None:
@@ -215,16 +221,6 @@ class Dataset(ABC):
                         node_labels[ast.literal_eval(k)] = v
                     inst.node_labels = node_labels
 
-            # Reading the node labels from json file
-            node_labels_uri = os.path.join(i_path, i_name + '_node_labels.json')
-            if os.path.exists(node_labels_uri):
-                with open(node_labels_uri, 'r') as node_labels_reader:
-                    str_dict = jsonpickle.decode(node_labels_reader.read())
-                    node_labels = {}
-                    for k, v in str_dict.items():
-                        node_labels[ast.literal_eval(k)] = v
-                    inst.node_labels = node_labels
-
             # Reading the edge labels from json file
             edge_labels_uri = os.path.join(i_path, i_name + '_edge_labels.json')
             if os.path.exists(edge_labels_uri):
@@ -246,6 +242,24 @@ class Dataset(ABC):
             if os.path.exists(mcd_uri):
                 with open(mcd_uri, 'r') as mcd_reader:
                     inst.minimum_counterfactual_distance = jsonpickle.decode(mcd_reader.read())
+            
+            # Reading the features from json file
+            features_uri = os.path.join(i_path, i_name + '_features.json')
+            if os.path.exists(features_uri):
+                with open(features_uri, 'r') as features_reader:
+                    # copy the previous data instance into this new object
+                    temp = DataInstanceWFeatures(inst.id)
+                    temp.minimum_counterfactual_distance = inst.minimum_counterfactual_distance
+                    temp.graph_label = inst.graph_label
+                    temp.edge_labels = inst.edge_labels
+                    temp.node_labels = inst.node_labels
+                    temp.graph = inst.graph
+                    temp.graph_dgl = inst.graph_dgl
+                    temp.name = inst.name
+                    
+                    temp.features = jsonpickle.decode(features_reader.read())
+                    
+                    inst = temp # replace the old object with the new temporary one
 
             result.append(inst)
 

@@ -19,7 +19,7 @@ eval_manager.train_oracles()
 print('Creating the evaluators...................................................................')
 eval_manager.create_evaluators()
 print('Evaluating the explainers..................................................................')
-#eval_manager.evaluate()
+eval_manager.evaluate()
 
 
 # for ds in ["1", "4", "5"]:

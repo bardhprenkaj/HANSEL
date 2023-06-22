@@ -299,6 +299,7 @@ class ExplainerFactory:
                     lr, epochs_ae, epochs_siamese, config_dict=None):
         
         result = AdaptiveGCE(id=self._explainer_id_counter,
+                             explainer_store_path=self._explainer_store_path,
                              fold_id=fold_id,
                              num_classes=num_classes,
                              time=time,
