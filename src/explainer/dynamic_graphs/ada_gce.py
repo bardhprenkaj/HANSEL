@@ -152,13 +152,13 @@ class AdaptiveGCE(Explainer):
 class GCNEncoder(nn.Module):
     
     def __init__(self,
-                 in_channelss=1,
-                 out_channelss=64):
+                 in_channels=1,
+                 out_channels=64):
         
         super(GCNEncoder, self).__init__()
-        self.conv1 = GCNConv(in_channelss, out_channelss)
-        self.conv2 = GCNConv(out_channelss, out_channelss)
-        self.conv3 = GCNConv(out_channelss, in_channelss)
+        self.conv1 = GCNConv(in_channels, out_channels)
+        self.conv2 = GCNConv(out_channels, out_channels)
+        self.conv3 = GCNConv(out_channels, in_channels)
         self.training = False
 
     def forward(self, x, edge_index):
