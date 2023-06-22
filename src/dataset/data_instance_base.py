@@ -118,7 +118,7 @@ class DataInstance(ABC):
         # If the instance does not contain a numpy array
         if (self._np_array is None):
             # We transform the adjacency matrix to a 32bits integer for being consistent with the reading of some datasets
-            result = nx.to_numpy_array(self.graph, dtype=np.int32)
+            result = nx.to_numpy_array(self.graph, dtype=np.float32)
 
             # Store the numpy array in the instance
             if (store):

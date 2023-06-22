@@ -146,12 +146,12 @@ class DatasetFactory():
             
             percentile = params_dict.get('percentile', 75)
             sampling_ratio = params_dict.get('sampling_ratio', .05)
-            min_connections = params_dict.get('min_connections', 3)
+            min_nodes_per_egonet = params_dict.get('min_nodes_per_egonet', 3)
         
             return self.get_coauthorship_dblp(begin_time,
                                               end_time,
                                               percentile,
-                                              min_connections,
+                                              min_nodes_per_egonet,
                                               sampling_ratio,
                                               dataset_dict)
         
@@ -163,13 +163,13 @@ class DatasetFactory():
             
     def get_coauthorship_dblp(self, begin_time, end_time,
                               percentile=75,
-                              min_connections=3,
+                              min_nodes_per_egonet=3,
                               sampling_ratio=.05, dataset_dict=None):
         
         result = CoAuthorshipDBLP(self._dataset_id_counter,
                                   begin_time=begin_time,
                                   end_time=end_time,
-                                  min_connections=min_connections,
+                                  min_nodes_per_egonet=min_nodes_per_egonet,
                                   percentile=percentile,
                                   sampling_ratio=sampling_ratio,
                                   config_dict=dataset_dict)

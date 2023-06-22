@@ -18,7 +18,7 @@ class CoAuthorshipDBLP(DynamicDataset):
                  end_time,
                  percentile=75,
                  sampling_ratio=.25,
-                 min_connections=5,
+                 min_nodes_per_egonet=5,
                  seed=42,
                  config_dict=None) -> None:
         
@@ -26,7 +26,7 @@ class CoAuthorshipDBLP(DynamicDataset):
         self.name = 'coauthorship_dblp'
         self.percentile = percentile
         self.sampling_ratio = sampling_ratio
-        self.min_connections = min_connections
+        self.min_nodes_per_egonet = min_nodes_per_egonet
             
         random.seed(seed)       
         
@@ -44,8 +44,6 @@ class CoAuthorshipDBLP(DynamicDataset):
         # take only those that have a large enough simplex
         
         times['graph'] = np.array(graphs, dtype=object)
-        
-        print(times['graph'])
         times = times.sort_values(by='timestamp')
         # retain only desired history
         times = times[(times.timestamp >= self.begin_t) & (times.timestamp <= self.end_t)]
@@ -63,18 +61,6 @@ class CoAuthorshipDBLP(DynamicDataset):
             index += num
 
         return C
-
-    def __filter_small_simplices(self, C):
-        indices = []
-        result = []
-
-        for i, sublist in enumerate(C):
-            if len(sublist) >= self.min_connections:
-                result.append(np.array(sublist))
-                indices.append(i)
-
-        return np.array(result, dtype=object), indices
-    
     
     def build_temporal_graph(self):
         self.unprocessed_data = {}
@@ -99,37 +85,12 @@ class CoAuthorshipDBLP(DynamicDataset):
         print("Preprocessing began...")
         #self.__sample_on_first_graph()
         print("Tracing ego networks...")
-        aligned_graphs_in_time, nodes_to_consider = self.__trace_ego_networks(self.unprocessed_data)
-        begin = min(aligned_graphs_in_time.keys())
-        end = max(aligned_graphs_in_time.keys())
-        print('Finished tracing ego networks')
-        
-        print('Converting all networkx to DataInstance objects...')
-        for i in range(begin, end + 1):
-            print(f'Working for year={i}')
-            self.dynamic_graph[i]._name = f'DBLP@{i}'
-            labels = self.__get_labels(aligned_graphs_in_time, i)
-            for node in nodes_to_consider:
-                ego_net = nx.ego_graph(aligned_graphs_in_time[i], node)
-                
-                print(f'edges = {len(ego_net.edges())} for node = {node}')
-                                
-                instance = DataInstanceWFeaturesAndWeights(id=node)
-                instance.name = f'ego_network_for_node={node}'
-                instance.weights = nx.to_numpy_array(ego_net)
-                instance.features = np.random.rand(8,1)
-                instance.graph = ego_net
-                instance.graph_label = labels[node]
-                
-                print(f'Adding DataInstance with id = {node}')
-                self.dynamic_graph[i].instances.append(instance)
-                
+        self.__trace_ego_networks(self.unprocessed_data)
         print('Eliminating the empty snapshots')
         # clear those snapshots that are empty
         for i in range(self.begin_t, self.end_t + 1):
             if self.dynamic_graph[i].get_data_len() == 0:
-                self.dynamic_graph.pop(i % self.begin_t, None)
-                
+                self.dynamic_graph.pop(i, None)
         print(f'Finished preprocessing.')
                 
                 
@@ -137,47 +98,98 @@ class CoAuthorshipDBLP(DynamicDataset):
         begin = min(temporal_graph.keys())
         end = max(temporal_graph.keys())
         
-        temporal_graph[begin] = self.__sample_nodes(temporal_graph[begin])
-        num_nodes_to_keep = int(self.sampling_ratio * temporal_graph[begin].number_of_nodes())
+        unique_ego_nets = self.__sample_nodes(temporal_graph[begin],
+                                              list(temporal_graph[begin].nodes()),
+                                              sample=True)
+        unique_ego_nets = self.__random_select_kv_pairs(unique_ego_nets)
         
-        nodes = list(temporal_graph[begin].nodes())
-        np.random.shuffle(nodes)
-        nodes = nodes[:num_nodes_to_keep]
-        print(f'Keeping {len(nodes)} nodes')
-        for node in nodes:
+        combined_graph = nx.Graph()
+        for ego_network in unique_ego_nets.values():
+            combined_graph.add_nodes_from(ego_network.nodes())
+            combined_graph.add_edges_from(ego_network.edges())
+            
+        # create the data instances for the first timestamp
+        temporal_graph[begin] = combined_graph
+        labels = self.__get_labels(unique_ego_nets)
+        self.dynamic_graph[begin]._name = f'DBLP@{begin}'
+        for node, graph in unique_ego_nets.items():
+            self.__create_data_instance(id=node, graph=graph,
+                                        year=begin, label=labels[node])
+        
+        # trace the ego networks through time
+        for node, graph in unique_ego_nets.items():
             print(f'Working for node = {node} on ego network tracing...')
             for i in range(begin + 1, end + 1):
                 if node not in temporal_graph[i].nodes():
-                    ego = nx.ego_graph(temporal_graph[i-1], node)
-                    temporal_graph[i] = nx.compose(temporal_graph[i], ego)
-
+                    temporal_graph[i] = nx.compose(temporal_graph[i], graph)
+                    
             print(f'Finished tracing for node = {node}')
             
-        return temporal_graph, nodes
+        for t in range(begin + 1, end + 1):
+            # set the name of thedataset
+            self.dynamic_graph[t]._name = f'DBLP@{t}'
+            # get the unique ego networks at time t
+            unique_ego_nets_at_t = self.__sample_nodes(temporal_graph[t],
+                                                       list(unique_ego_nets.keys()),
+                                                       unique=False)
+            # get the labels of the ego networks at time t
+            labels = self.__get_labels(unique_ego_nets_at_t)
+            # create data instances at time t
+            for node, graph in unique_ego_nets_at_t.items():
+                self.__create_data_instance(id=node, graph=graph,
+                                            year=t, label=labels[node])
+                      
     
-    def __sample_nodes(self, graph):
-        remaining_nodes = [
-            node if len(nx.ego_graph(graph, node).edges()) >= self.min_connections else None for node in graph.nodes() 
-        ]
-                
-        remaining_nodes = set(remaining_nodes)
-        remaining_nodes = remaining_nodes.difference(set([None]))
+    def __create_data_instance(self, id: int, graph: nx.Graph, year: int, label: float):
+        instance = DataInstanceWFeaturesAndWeights(id=id)
+        instance.name = f'ego_network_for_node={id}'
+        instance.weights = nx.to_numpy_array(graph)
+        instance.features = np.random.rand(8,1)
+        instance.graph = graph
+        instance.graph_label = label
+        print(f'Adding DataInstance with id = {id}')
+        self.dynamic_graph[year].instances.append(instance)
+    
+    def __sample_nodes(self, graph: nx.Graph, trace_nodes: List[int], sample=False, unique=True):
+        ego_networks = {}
+        for node in trace_nodes:
+            ego_network = nx.ego_graph(graph, node)
+            if not sample or ego_network.number_of_nodes() >= self.min_nodes_per_egonet:
+                ego_networks[node] = ego_network
+        
+        unique_networks = ego_networks
+        
+        if unique:
+            unique_networks = {}
+            for node, ego_network in ego_networks.items():
+                is_duplicate = False
             
-        return graph.subgraph(list(remaining_nodes))
+                for unique_network in unique_networks.values():
+                    if set(ego_network.nodes()).issubset(set(unique_network.nodes())):
+                        is_duplicate = True
+                        break
+            
+                if not is_duplicate:
+                    unique_networks[node] = ego_network
     
+        return unique_networks
+    
+    def __random_select_kv_pairs(self, dictionary: Dict[int, nx.Graph]):
+        keys = list(dictionary.keys())
+        num_nodes_to_keep = int(self.sampling_ratio * len(keys))
+        selected_keys = random.sample(keys, num_nodes_to_keep)
+        selected_pairs = {key: dictionary[key] for key in selected_keys}
+        return selected_pairs
+        
     def __in_percentile(self, average_weights: Dict[int, float]) -> Dict[int, int]:
         percentile_value = np.percentile(list(average_weights.values()), self.percentile)
         return {key: 1 if value > percentile_value else 0 for key, value in average_weights.items()}
     
-    def __get_labels(self, temporal_graph, year) -> Dict[int, int]:
-        assert (year <= max(temporal_graph.keys()))
-        begin = min(temporal_graph.keys())
-
+    def __get_labels(self, ego_nets: Dict[int, nx.Graph]) -> Dict[int, int]:      
         weight_dict = {}
-        for node in temporal_graph[begin].nodes():
-            ego = nx.ego_graph(temporal_graph[year], node)
-            weights = list(nx.get_edge_attributes(ego, 'weight').values())
-            weight_dict[node] = np.mean(weights) if len(weights) > 0 else 0
+        for node, graph in ego_nets.items():
+            weights = list(nx.get_edge_attributes(graph, 'weight').values())
+            weight_dict[node] = np.mean(weights) if len(weights) > 0 else -1
             
         return  self.__in_percentile(weight_dict)
 
