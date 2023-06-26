@@ -1,3 +1,4 @@
+from src.oracle.embedder_base import Embedder
 from src.dataset.dynamic_graphs.dataset_dynamic import DynamicDataset
 from src.oracle.oracle_base import Oracle
 
@@ -28,9 +29,8 @@ class DynamicOracle(Oracle):
     def _real_predict_proba(self, data_instance):
         return self.base_oracle._real_predict_proba(data_instance)
     
-    
     def embedd(self, instance):
-        return self.base_oracle.embedd(instance)
+        return instance
     
     def write_oracle(self):
         return self.base_oracle.write_oracle()

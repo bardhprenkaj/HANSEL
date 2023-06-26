@@ -19,6 +19,7 @@ class CoAuthorshipDBLP(DynamicDataset):
                  percentile=75,
                  sampling_ratio=.25,
                  min_nodes_per_egonet=5,
+                 features_dim=8,
                  seed=42,
                  config_dict=None) -> None:
         
@@ -27,6 +28,7 @@ class CoAuthorshipDBLP(DynamicDataset):
         self.percentile = percentile
         self.sampling_ratio = sampling_ratio
         self.min_nodes_per_egonet = min_nodes_per_egonet
+        self.features_dim = features_dim
             
         random.seed(seed)       
         
@@ -144,7 +146,7 @@ class CoAuthorshipDBLP(DynamicDataset):
         instance = DataInstanceWFeaturesAndWeights(id=id)
         instance.name = f'ego_network_for_node={id}'
         instance.weights = nx.to_numpy_array(graph)
-        instance.features = np.random.rand(8,1)
+        instance.features = np.random.rand(graph.number_of_nodes(), self.features_dim)
         instance.graph = graph
         instance.graph_label = label
         print(f'Adding DataInstance with id = {id}')

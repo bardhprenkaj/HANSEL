@@ -3,6 +3,7 @@ from src.dataset.converters.weights_converter import \
     DefaultFeatureAndWeightConverter
 from src.evaluation.evaluation_metric_factory import EvaluationMetricFactory
 from src.explainer.dynamic_graphs.ada_gce import AdaptiveGCE
+from src.explainer.dynamic_graphs.model import EVE
 from src.explainer.ensemble.ensemble_factory import EnsembleFactory
 from src.explainer.explainer_base import Explainer
 from src.explainer.explainer_bidirectional_search import (
@@ -281,22 +282,66 @@ class ExplainerFactory:
             num_classes = explainer_parameters.get('num_classes', 2)
             time = explainer_parameters.get('time', 0)
             in_channels = explainer_parameters.get('in_channels', 1)
-            out_channels = explainer_parameters.get('out_channels', 64)
+            out_channels = explainer_parameters.get('out_channels', 4)
             batch_size = explainer_parameters.get('batch_size', 24)
             lr = explainer_parameters.get('lr', 1e-3)
             epochs_ae = explainer_parameters.get('epochs_ae', 100)
             epochs_siamese = explainer_parameters.get('epochs_siamses', 100)
+            
+            enc_name = explainer_parameters.get('encoder_name', 'var_gcn_encoder')
+            dec_name = explainer_parameters.get('decoder_name', None)
+            contrastive_base_model = explainer_parameters.get('contrastive_base_model', 'vgae')
        
             return self.get_ada_gce(fold_id, num_classes, time, in_channels, out_channels, batch_size,
-                                    lr, epochs_ae, epochs_siamese, config_dict=explainer_dict)
-
+                                    lr, epochs_ae, epochs_siamese, enc_name, dec_name, contrastive_base_model,
+                                    config_dict=explainer_dict)
+        elif explainer_name == 'eve':
+            fold_id = explainer_parameters.get('fold_id', 0)
+            num_classes = explainer_parameters.get('num_classes', 2)
+            time = explainer_parameters.get('time', 0)
+            in_channels = explainer_parameters.get('in_channels', 1)
+            out_channels = explainer_parameters.get('out_channels', 4)
+            batch_size = explainer_parameters.get('batch_size', 24)
+            lr = explainer_parameters.get('lr', 1e-3)
+            epochs_ae = explainer_parameters.get('epochs_ae', 100)
+            
+            enc_name = explainer_parameters.get('encoder_name', 'var_gcn_encoder')
+            dec_name = explainer_parameters.get('decoder_name', None)
+            autoencoder_name = explainer_parameters.get('autoencoder_name', 'vgae')
+               
+            return self.get_eve(fold_id, num_classes, time, in_channels, out_channels, batch_size,
+                                    lr, epochs_ae, enc_name, dec_name, autoencoder_name,
+                                    config_dict=explainer_dict)
         else:
             raise ValueError('''The provided explainer name does not match any explainer provided 
             by the factory''')
             
             
+    def get_eve(self, fold_id, num_classes, time, in_channels, out_channels, batch_size,
+                    lr, epochs_ae, enc_name, dec_name, autoencoder_name,
+                    config_dict=None):
+        
+        result = EVE(id=self._explainer_id_counter,
+                     explainer_store_path=self._explainer_store_path,
+                     fold_id=fold_id,
+                     num_classes=num_classes,
+                     time=time,
+                     in_channels=in_channels,
+                     out_channels=out_channels,
+                     batch_size=batch_size,
+                     lr=lr,
+                     epochs_ae=epochs_ae,
+                     enc_name=enc_name,
+                     dec_name=dec_name,
+                     autoencoder_name=autoencoder_name,
+                     config_dict=config_dict)
+        
+        self._explainer_id_counter += 1
+        return result  
+            
     def get_ada_gce(self, fold_id, num_classes, time, in_channels, out_channels, batch_size,
-                    lr, epochs_ae, epochs_siamese, config_dict=None):
+                    lr, epochs_ae, epochs_siamese, enc_name, dec_name, contrastive_base_model,
+                    config_dict=None):
         
         result = AdaptiveGCE(id=self._explainer_id_counter,
                              explainer_store_path=self._explainer_store_path,
@@ -309,6 +354,9 @@ class ExplainerFactory:
                              lr=lr,
                              epochs_ae=epochs_ae,
                              epochs_siamese=epochs_siamese,
+                             enc_name=enc_name,
+                             dec_name=dec_name,
+                             contrastive_base_model=contrastive_base_model,
                              config_dict=config_dict)
         
         self._explainer_id_counter += 1

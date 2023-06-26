@@ -60,10 +60,10 @@ class DBLPCoAuthorshipCustomOracle(Oracle):
         if os.path.exists(weight_file_path):
             with open(weight_file_path, 'r') as f:
                 self.weight_dict = jsonpickle.decode(f.read())
-                
+                self.weight_dict = {int(k): v for k, v in self.weight_dict.items()}
                 
         percentile_file_path = os.path.join(directory, 'percentile_value.json')
         if os.path.exists(percentile_file_path):
             with open(percentile_file_path, 'r') as f:
-                self.percentile_value = jsonpickle.decode(f.read())['percentile_value']
+                self.percentile_value = float(jsonpickle.decode(f.read())['percentile_value'])
         

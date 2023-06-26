@@ -22,14 +22,16 @@ class DynamicEvaluator(Evaluator):
                          explainer, evaluation_metrics,
                          results_store_path, run_number)
         
-        self.dataset = deepcopy(data)
+        self.dyn_graph = data.dynamic_graph
         
         
     def evaluate(self):
-        begin_time = min(self.dataset.dynamic_graph.keys())
-        for time in self.dataset.dynamic_graph.keys():
-            self._explainer.time = time - begin_time
-            self._data = self.dataset.dynamic_graph[time]
-            super().evaluate()                
+        begin_time = min(self.dyn_graph.keys())
+        for time in self.dyn_graph.keys():
+            print(f'Evaluating for iteration {time - begin_time}')
+            self._explainer.iteration = time - begin_time
+            self._data = self.dyn_graph[time]
+            super().evaluate()               
+            break 
                 
                 

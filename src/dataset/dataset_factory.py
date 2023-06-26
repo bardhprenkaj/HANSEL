@@ -147,12 +147,14 @@ class DatasetFactory():
             percentile = params_dict.get('percentile', 75)
             sampling_ratio = params_dict.get('sampling_ratio', .05)
             min_nodes_per_egonet = params_dict.get('min_nodes_per_egonet', 3)
+            features_dim = params_dict.get('features_dim', 8)
         
             return self.get_coauthorship_dblp(begin_time,
                                               end_time,
                                               percentile,
                                               min_nodes_per_egonet,
                                               sampling_ratio,
+                                              features_dim,
                                               dataset_dict)
         
         # If the dataset name does not match any of the datasets provided by the factory
@@ -164,7 +166,9 @@ class DatasetFactory():
     def get_coauthorship_dblp(self, begin_time, end_time,
                               percentile=75,
                               min_nodes_per_egonet=3,
-                              sampling_ratio=.05, dataset_dict=None):
+                              sampling_ratio=.05, 
+                              features_dim=8,
+                              dataset_dict=None):
         
         result = CoAuthorshipDBLP(self._dataset_id_counter,
                                   begin_time=begin_time,
@@ -172,6 +176,7 @@ class DatasetFactory():
                                   min_nodes_per_egonet=min_nodes_per_egonet,
                                   percentile=percentile,
                                   sampling_ratio=sampling_ratio,
+                                  features_dim=features_dim,
                                   config_dict=dataset_dict)
         
         self._dataset_id_counter += 1
@@ -181,9 +186,6 @@ class DatasetFactory():
         
         if ds_exists:
             result.read_datasets(ds_uri)
-            
-            print("Finished reading")
-            print(result.dynamic_graph[2000].instances)
         else:
             result.read_csv_file(os.path.join(self._data_store_path, 'dynamic_graphs', ds_name))
             result.build_temporal_graph()
