@@ -308,6 +308,9 @@ class EVE(Explainer):
             data_dict_cls[label].append(self.__build_geometric_data_instance(adj_matrix=adj_matrices[i],
                                                                              features=features[i],
                                                                              label=label if not index_label else int(i)))
+            
+            
+        print(data_dict_cls)
         data_loaders = []
         for cls in data_dict_cls.keys():
             data_loaders.append(GeometricDataLoader(

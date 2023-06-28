@@ -60,7 +60,7 @@ class DynTreeCycles(DynamicDataset):
                 new_graph = self.__sort_nodes_by_degree(instance.graph)
                 instance.from_numpy_matrix(nx.adjacency_matrix(new_graph))
                 # set the node features
-                self.dynamic_graph[i][j] = self.__generate_node_features(instance)
+                self.dynamic_graph[i].instances[j] = self.__generate_node_features(instance)
                 
     def __sort_nodes_by_degree(self, original_graph: nx.Graph) -> nx.Graph:
         # Step 1: Compute the degrees of all nodes
@@ -86,17 +86,14 @@ class DynTreeCycles(DynamicDataset):
         betweenness_centrality = nx.betweenness_centrality(graph)
         # Calculate the closeness centrality
         closeness_centrality = nx.closeness_centrality(graph)
-        # Calculate the eigenvector centrality
-        eigenvector_centrality = nx.eigenvector_centrality(graph, max_iter=500)
         # Calculate the harmonic centrality
         harmonic_centrality = nx.harmonic_centrality(graph)
         # Calculate the clustering coefficient
         clustering_coefficient = nx.clustering(graph)
         # stack the above calculations and transpose the matrix
-        # the new dimensionality is num_nodes x 5
+        # the new dimensionality is num_nodes x 4
         features = np.stack((list(betweenness_centrality.values()),
                              list(closeness_centrality.values()),
-                             list(eigenvector_centrality.values()),
                              list(harmonic_centrality.values()),
                              list(clustering_coefficient.values())), axis=0).T
         # copy the instance information and set the node features
