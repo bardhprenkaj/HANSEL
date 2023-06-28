@@ -142,7 +142,7 @@ class Dataset(ABC):
                     mcd_writer.write(jsonpickle.encode(i.minimum_counterfactual_distance))
                     
                     
-            if i.features is not None:
+            if isinstance(i, DataInstanceWFeatures) and i.features is not None:
                 with open(os.path.join(i_path, i_name + '_features.json'), 'w') as feature_writer:
                     feature_writer.write(jsonpickle.encode(i.features))
 

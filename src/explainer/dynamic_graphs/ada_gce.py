@@ -151,7 +151,7 @@ class AdaptiveGCE(Explainer):
                     optimiser.zero_grad()
                     
                     z = autoencoder.encode(x, edge_index, edge_attr)
-                    loss = autoencoder.loss(z, pos_edge_index=edge_index)
+                    loss = autoencoder.loss(z, edge_index=edge_index)
 
                     loss.backward()
                     optimiser.step()

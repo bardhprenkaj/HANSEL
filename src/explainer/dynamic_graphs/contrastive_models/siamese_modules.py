@@ -3,8 +3,34 @@ from src.explainer.dynamic_graphs.contrastive_models.encoders import Encoder
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
+class FCContrastiveLearner(nn.Module):
+    
+    def __init__(self, in_dimension=3, num_layers=4):        
+        super(FCContrastiveLearner, self).__init__()
+        
+        self.in_dimension = in_dimension
+
+        self.fc_layers = []
+        for _ in range(num_layers - 1):
+            self.fc_layers.append(nn.Linear(self.in_dimension, max(self.in_dimension // 2, 2)))
+            self.fc_layers.append(nn.ReLU())
+            self.in_dimension = max(self.in_dimension // 2, 2)
+            
+        self.fc_layers.append(nn.Linear(self.in_dimension, 1))
+        
+        self.fc_layers = nn.Sequential(*self.fc_layers)
+
+    def forward(self, x):
+        x = self.fc_layers(x)
+        return torch.sigmoid(x.squeeze())
+    
+    def predict(self, x):
+        with torch.no_grad():
+            self.forward(x)
+            
 class DenseSiamese(nn.Module):
     
     def __init__(self,
@@ -42,3 +68,16 @@ class DenseSiamese(nn.Module):
         # return the sigmoid of the last layer
         return torch.sigmoid(z.squeeze())
                     
+                    
+class ContrastiveLoss(torch.nn.Module):
+
+    def __init__(self, margin=2.0):
+        super(ContrastiveLoss, self).__init__()
+        self.margin = margin
+
+    def forward(self, output1, output2, label):
+        euclidean_distance = F.pairwise_distance(output1, output2)
+        pos = (1-label) * torch.pow(euclidean_distance, 2)
+        neg = (label) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0), 2)
+        loss_contrastive = torch.mean( pos + neg )
+        return loss_contrastive

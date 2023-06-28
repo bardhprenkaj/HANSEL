@@ -1,16 +1,18 @@
-from src.dataset.dynamic_graphs.dataset_coauthorship_dblp import CoAuthorshipDBLP
-from src.dataset.dataset_imbd import IMDBDataset
-from src.dataset.dataset_hiv import HIVDataset
-from src.dataset.dataset_bbbp import BBBPDataset
-from src.dataset.dataset_adhd import ADHDDataset
-from src.dataset.dataset_asd import ASDDataset
-from src.dataset.dataset_node import NodeDataset
-from src.dataset.dataset_base import Dataset
-from src.dataset.dataset_synthetic_generator import Synthetic_Data
-from src.dataset.dataset_trisqr import TrianglesSquaresDataset
-
 import os
 import shutil
+
+from src.dataset.dataset_adhd import ADHDDataset
+from src.dataset.dataset_asd import ASDDataset
+from src.dataset.dataset_base import Dataset
+from src.dataset.dataset_bbbp import BBBPDataset
+from src.dataset.dataset_hiv import HIVDataset
+from src.dataset.dataset_imbd import IMDBDataset
+from src.dataset.dataset_node import NodeDataset
+from src.dataset.dataset_synthetic_generator import Synthetic_Data
+from src.dataset.dataset_trisqr import TrianglesSquaresDataset
+from src.dataset.dynamic_graphs.dataset_coauthorship_dblp import \
+    CoAuthorshipDBLP
+from src.dataset.dynamic_graphs.dynamic_tree_cycles import DynTreeCycles
 
 
 class DatasetFactory():
@@ -156,12 +158,62 @@ class DatasetFactory():
                                               sampling_ratio,
                                               features_dim,
                                               dataset_dict)
+            
+        elif dataset_name == 'dynamic_tree_cycles':
+            if not 'begin_time' in params_dict:
+                raise ValueError('"begin_time" is mandatory for CoAuthorshipDBLP')
+            if not 'end_time' in params_dict:
+                raise ValueError('"end_time" is mandatory for CoAuthorshipDBLP')
+            
+            begin_time = params_dict['begin_time']
+            end_time = params_dict['end_time']
+            
+            assert (begin_time < end_time)
+            
+            num_instances_per_snapshot = params_dict.get('num_instances_per_snapshot', 300)
+            n_nodes = params_dict.get('n_nodes', 300)
+            nodes_in_cycle = params_dict.get('nodes_in_cycle', 200)
+            
+            return self.get_dynamic_tree_cycles(begin_time=begin_time,
+                                                end_time=end_time,
+                                                num_instances_per_snapshot=num_instances_per_snapshot,
+                                                n_nodes=n_nodes,
+                                                nodes_in_cycle=nodes_in_cycle,
+                                                dataset_dict=dataset_dict)
         
         # If the dataset name does not match any of the datasets provided by the factory
         else:
             raise ValueError('''The provided dataset name is not valid. Valid names include: tree-cycles,
              tree-cycles-balanced, tree-cycles-dummy''')
             
+    def get_dynamic_tree_cycles(self, begin_time, end_time,
+                                num_instances_per_snapshot=300,
+                                n_nodes=300,
+                                nodes_in_cycle=200,
+                                dataset_dict=None):
+        
+        result = DynTreeCycles(id=self._dataset_id_counter,
+                               begin_t=begin_time,
+                               end_t=end_time,
+                               num_instances_per_snapshot=num_instances_per_snapshot,
+                               n_nodes=n_nodes,
+                               nodes_in_cycle=nodes_in_cycle,
+                               config_dict=dataset_dict)
+        
+        self._dataset_id_counter += 1
+        ds_name = 'dynamic_tree_cycles'
+        ds_uri = os.path.join(self._data_store_path, 'dynamic_graphs', ds_name, 'processed')
+        ds_exists = os.path.exists(ds_uri)
+        
+        if ds_exists:
+            result.read_datasets(ds_uri)
+        else:
+            result.build_temporal_graph()
+            result.load_or_generate_splits(os.path.join(self._data_store_path, 'dynamic_graphs', ds_name),
+                                           n_splits=10, shuffle=True)
+            result.write_datasets(ds_uri)
+            
+        return result
             
     def get_coauthorship_dblp(self, begin_time, end_time,
                               percentile=75,

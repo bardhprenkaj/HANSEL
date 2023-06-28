@@ -1,7 +1,9 @@
+from abc import ABC
+from typing import List
+
+from src.dataset.data_instance_base import DataInstance
 from src.dataset.dataset_base import Dataset
 from src.oracle.oracle_base import Oracle
-
-from abc import ABC
 
 
 class Explainer(ABC):
@@ -29,5 +31,5 @@ class Explainer(ABC):
     def name(self, new_name):
         self._name = new_name
 
-    def explain(self, instance, oracle: Oracle, dataset: Dataset):
+    def explain(self, instance, oracle: Oracle, dataset: Dataset) -> List[DataInstance]:
         pass

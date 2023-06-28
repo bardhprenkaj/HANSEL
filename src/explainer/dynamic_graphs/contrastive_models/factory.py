@@ -5,7 +5,7 @@ import torch.nn as nn
 from src.explainer.dynamic_graphs.contrastive_models.autoencoders import (
     CustomGAE, CustomVGAE)
 from src.explainer.dynamic_graphs.contrastive_models.encoders import \
-    VariationalGCNEncoder
+    GCNEncoder, GraphSAGE, VariationalGCNEncoder
 from src.explainer.dynamic_graphs.contrastive_models.siamese_modules import \
     DenseSiamese
 
@@ -34,6 +34,10 @@ class AEFactory:
                     **kwargs) -> nn.Module:
         if name.lower() == 'var_gcn_encoder':
             return VariationalGCNEncoder(in_channels=in_channels, out_channels=out_channels)
+        elif name.lower() == 'gcn_encoder':
+            return GCNEncoder(in_channels=in_channels, out_channels=out_channels)
+        elif name.lower() == 'graph_sage':
+            return GraphSAGE(in_channels=in_channels, hidden_dim=out_channels)
         else:
             raise NameError(f"The encoder {name} isn't supported.")
         

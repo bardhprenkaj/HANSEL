@@ -1,17 +1,25 @@
 import os
-from itertools import combinations, product
+from itertools import combinations, permutations, product
 from operator import itemgetter
 from typing import List, Tuple, Dict
+from src.dataset.data_instance_features import DataInstanceWFeatures
+from src.explainer.dynamic_graphs.contrastive_models.siamese_modules import FCContrastiveLearner
 from src.dataset.data_instance_base import DataInstance
-
+import torch.nn.functional as F
 import joblib
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from sklearn.linear_model import LogisticRegressionCV
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
 from torch_geometric.data import Data
-from torch_geometric.loader import DataLoader
+from torch_geometric.loader import DataLoader as GeometricDataLoader
+
+from torch.utils.data import TensorDataset, DataLoader
+from sklearn.model_selection import train_test_split
+
+import matplotlib.pyplot as plt
 
 from src.dataset.dataset_base import Dataset
 from src.dataset.torch_geometric.dataset_geometric import TorchGeometricDataset
@@ -73,9 +81,13 @@ class EVE(Explainer):
         ]
         
         
-        self.contrastive_learner = LogisticRegressionCV(penalty='l2')
-
+        self.contrastive_learner = LogisticRegression(penalty='elasticnet', solver='saga', l1_ratio=.4)
+        desired_weights = [[25., 70., 5.]]  # Replace with your desired weights
+        self.contrastive_learner.coef_ = desired_weights
+        
+        
         self.explainer_store_path = explainer_store_path
+
         
         
     def explain(self, instance, oracle: Oracle, dataset: Dataset):        
@@ -91,22 +103,24 @@ class EVE(Explainer):
                                        oracle=oracle,
                                        search_for_instance=instance))])
             
-            
-        df.rec_cf *= -1
-        
+        df.rec_cf *= -1       
+                
         y_pred = self.contrastive_learner.predict(df.values[:,:-1])
-        y_pred_proba = self.contrastive_learner.predict_proba(df.values[:,:-1])
+        #y_pred_proba = self.contrastive_learner.predict_proba(df.values[:,:-1])
+        
         cf_indices = np.where(y_pred == 1)[0]
+                
+        if len(cf_indices) != 0:           
+            return [dataset.get_instance(int(i)) for i in df.values[:,-1][cf_indices]]
+        else:
+            return [instance]
         
-        print(y_pred)
-        print(y_pred_proba)
-        
-        if len(cf_indices) != 0:
+        """if len(cf_indices) != 0:
             y_pred_proba = y_pred_proba[cf_indices][:,1].squeeze()
             max_index = np.argmax(y_pred_proba)
             instance = dataset.get_instance(int(df.values[:,-1][cf_indices[max_index]]))
         
-        return instance        
+        return instance"""     
         
     def fit(self, oracle: Oracle, dataset: Dataset, fold_id=0):
         explainer_name = f'{self.__class__.__name__}_fit_on_{dataset.name}_fold_id_{fold_id}'
@@ -116,7 +130,7 @@ class EVE(Explainer):
         if os.path.exists(explainer_uri):
             # Load the weights of the trained model
             self.load_autoencoders()
-            self.load_contrastive_learner(oracle, dataset)
+            self.__fit_linear_objective(oracle, dataset)
         else:
             # Create the folder to store the oracle if it does not exist
             os.mkdir(explainer_uri)                    
@@ -138,14 +152,14 @@ class EVE(Explainer):
     def save_constrastive_learner(self):
         constrastive_learner_path = os.path.join(self.explainer_store_path,
                                                  self.name,
-                                                 'logistic_regression_weights.joblib')
+                                                 f'{self.contrastive_learner.__class__.__name__}_weights.joblib')
         
         joblib.dump(self.contrastive_learner, constrastive_learner_path)
         
     def load_contrastive_learner(self, oracle, dataset):
         constrastive_learner_path = os.path.join(self.explainer_store_path,
                                                  self.name,
-                                                 'logistic_regression_weights.joblib')
+                                                 f'{self.contrastive_learner.__class__.__name__}_weights.joblib')
         if os.path.exists(constrastive_learner_path):
             self.contrastive_learner = joblib.load(constrastive_learner_path)
         else:
@@ -169,10 +183,11 @@ class EVE(Explainer):
                     edge_attr = item.edge_attr.squeeze(dim=0).to(self.device)
                     
                     optimiser.zero_grad()
-                    
+
                     z = autoencoder.encode(x, edge_index, edge_attr)
                     loss = autoencoder.loss(z, pos_edge_index=edge_index)
-
+                    loss = loss + (1 / item.num_nodes) * autoencoder.kl_loss()
+                     
                     loss.backward()
                     optimiser.step()
                     
@@ -185,27 +200,31 @@ class EVE(Explainer):
             
     def __fit_linear_objective(self, oracle: Oracle, dataset: Dataset):
         X, y = self.__build_contrastive_table(oracle, dataset)
-        self.contrastive_learner.fit(X, y)
-        self.save_constrastive_learner()
+        print(f'Previous weights = {self.contrastive_learner.coef_}')
+        self.contrastive_learner.fit(X,y)
+        print(self.contrastive_learner.score(X, y))
+        print(f'Learned weights = {self.contrastive_learner.coef_}')
      
     def __build_contrastive_table(self, oracle: Oracle, dataset: Dataset) -> Tuple[np.array, np.array]:
         pos_data_loader, neg_data_loader = self.transform_data_for_contrastive_learning(oracle, dataset)
         # get positive pairs and transform to dataframe        
-        rows: Dict[str, float] = self.__prepare_table(pos_data_loader, dataset, oracle, cls=1.)
+        rows: List[Dict[str, float]] = self.__training_table(pos_data_loader, dataset, oracle, cls=1.)
         df = pd.DataFrame(rows)
         # get negative pairs and concatenate the two dataframes
-        rows = (self.__prepare_table(neg_data_loader, dataset, oracle, cls=0.))
+        rows = (self.__training_table(neg_data_loader, dataset, oracle, cls=0.))
         df = pd.concat([df, pd.DataFrame(rows)])
-                    
-        df.rec_cf *= -1
-        
-        X = df.values[:,:-1]
-        y = df.values[:,-1]
-        
+        print(df)
+        #df.to_csv('hello.csv', index=False)
+        # get the y label
+        y = df.y.values
+        # drop it
+        df.drop(columns=['y'], inplace=True)
+        # ignore the "tuple" column
+        X = df.values[:,1:]
         return X, y
     
     
-    def __inference_table(self, data_loader: DataLoader, dataset: Dataset,
+    def __inference_table(self, data_loader: GeometricDataLoader, dataset: Dataset,
                           oracle: Oracle,
                           search_for_instance: DataInstance):
         
@@ -218,52 +237,68 @@ class EVE(Explainer):
             edge_attr = data.edge_attr.squeeze(dim=0).to(self.device)
             
             instance = dataset.get_instance(data.y.item())
-            cf_label = oracle.predict(instance)
+            #factual_label = oracle.predict(search_for_instance)
                         
             for i, autoencoder in enumerate(self.autoencoders):
-                z = autoencoder.encode(x, edge_index, edge_attr)
-                rec_error  = autoencoder.loss(z, pos_edge_index=edge_index).item()
+                z = autoencoder(x, edge_index, edge_attr)
+                rec_error  = autoencoder.loss(z, edge_index=edge_index).item()
                 
-                if cf_label != i:
+                if oracle.predict(instance) != i:
                     rows['rec_cf'].append(rec_error)
                 else:
                     rows['rec_f'].append(rec_error)
                     
-            rows['index'].append(data.y.item())
+            rows['index'].append(instance.id)
             
-            similarity = 1 / (1 + GraphEditDistanceMetric().evaluate(search_for_instance, instance))
+            similarity = 1/(1+GraphEditDistanceMetric().evaluate(search_for_instance, instance))
             rows['sim'].append(similarity)
             
         return rows
         
-    def __prepare_table(self, data_loader: DataLoader, dataset: Dataset, oracle: Oracle, cls=1):
-        rows = {'rec_cf': [], 'rec_f': [], 'sim': [], 'y': []}
+    def __training_table(self, data_loader: GeometricDataLoader, dataset: Dataset, oracle: Oracle, cls=1):
+        rows = []
         for item in data_loader:           
             indices = list(map(lambda label: label.y.item(), item))
-            # get the second element
-            x = item[-1].x.squeeze(dim=0).to(self.device)
-            edge_index = item[-1].edge_index.squeeze(dim=0).to(self.device)
-            edge_attr = item[-1].edge_attr.squeeze(dim=0).to(self.device)
+            # get the anchor instance and its predicted label
+            anchor_instance = dataset.get_instance(indices[0])
+            anchor_label = oracle.predict(anchor_instance)
             
-            instance1 = dataset.get_instance(indices[0])
-            instance2 = dataset.get_instance(indices[1])
-                        
-            for i, autoencoder in enumerate(self.autoencoders):
-                z = autoencoder.encode(x, edge_index, edge_attr)
-                rec_error = autoencoder.loss(z, pos_edge_index=edge_index).item() 
-                
-                if i != oracle.predict(instance1):
-                    rows['rec_cf'].append(rec_error)
-                else:
-                    rows['rec_f'].append(rec_error)
-                            
-            similarity = 1 / (1 + GraphEditDistanceMetric().evaluate(instance1, instance2))
-            rows['sim'].append(similarity)
-            rows['y'].append(cls)
+            curr_row = {'tuple': [], 'y': -1, 'rec_cf': 1, 'rec_f': 0}
+            # set dummy reconstruction errors for all elements in the tuple
+            # set dummy similarity for all elements in the tuple
+            #curr_row.update({f'rec_{i}_{j}': 1 for i in range(len(indices)-1) for j in range(len(self.autoencoders))})
+            curr_row.update({f'sim_{i}': 0 for i in range(len(indices) - 1)})
             
+            # for all the other instances in the tuple
+            # get the reconstruction errors (counterfactual and factual)
+            # and their similarity with the anchor
+            for i, data in enumerate(item[1:]):
+                x = data.x.squeeze(dim=0).to(self.device)
+                edge_index = data.edge_index.squeeze(dim=0).to(self.device)
+                edge_attr = data.edge_attr.squeeze(dim=0).to(self.device)
+                # get the current instance
+                instance = dataset.get_instance(indices[i + 1])
+                # measure reconstruction error
+                for j, autoencoder in enumerate(self.autoencoders):
+                    z = autoencoder(x,edge_index, edge_attr)
+                    rec_error = autoencoder.loss(z, edge_index=edge_index).item()
+                    # counterfactual error as small as possible
+                    if anchor_label != j: 
+                        rec_error *= -1
+                        curr_row['rec_cf'] = rec_error
+                    else:
+                        curr_row['rec_f'] = rec_error
+                # measure the similarity
+                similarity = 1 / (1 + GraphEditDistanceMetric().evaluate(anchor_instance, instance))
+                curr_row[f'sim_{i}'] = similarity
+            # set the class (either positive or negative)
+            # and the indices of the tuples for reference purposes
+            curr_row['y'] = cls
+            curr_row['tuple'] = indices
+            rows.append(curr_row)
         return rows
             
-    def transform_data(self, oracle: Oracle, dataset: Dataset, index_label=False) -> List[DataLoader]:
+    def transform_data(self, oracle: Oracle, dataset: Dataset, index_label=False) -> List[GeometricDataLoader]:
         features, adj_matrices, _ = self.__get_basic_info(dataset)
         indices = dataset.get_split_indices()[self.fold_id]['train']        
 
@@ -275,7 +310,7 @@ class EVE(Explainer):
                                                                              label=label if not index_label else int(i)))
         data_loaders = []
         for cls in data_dict_cls.keys():
-            data_loaders.append(DataLoader(
+            data_loaders.append(GeometricDataLoader(
                 TorchGeometricDataset(data_dict_cls[cls]),
                                       batch_size=1,
                                       shuffle=True,
@@ -284,7 +319,9 @@ class EVE(Explainer):
         
         return data_loaders
     
-    def transform_data_for_contrastive_learning(self, oracle: Oracle, dataset: Dataset) -> Tuple[DataLoader, DataLoader]:
+    
+    
+    def transform_data_for_contrastive_learning(self, oracle: Oracle, dataset: Dataset) -> Tuple[GeometricDataLoader, GeometricDataLoader]:
         features, adj_matrices, _ = self.__get_basic_info(dataset)
         # get only the training data to avoid going out of bounds
         indices = dataset.get_split_indices()[self.fold_id]['train'] 
@@ -304,7 +341,8 @@ class EVE(Explainer):
         # generate positive and negative samples
         combos = list(product(*class_indices))
         # filter the combinations to keep only the positive tuples
-        positive_combos = set([t for t in combos if len(set(t)) == len(t)])
+        positive_combos = list([t for t in combos if len(set(t)) == len(t)])
+        positive_combos = set(self.__get_tuple_permutations(positive_combos))
         # initialise the list of negative tuples
         _max = 0
         for indices in class_indices:
@@ -322,12 +360,12 @@ class EVE(Explainer):
         for i, negative_index in enumerate(negative_combos):
             negative_combos[i] = list(itemgetter(*negative_index)(data))
                     
-        pos_data_loader = DataLoader(TorchGeometricDataset(positive_combos),
+        pos_data_loader = GeometricDataLoader(TorchGeometricDataset(positive_combos),
                                       batch_size=1,
                                       shuffle=True,
                                       num_workers=2)
         
-        neg_data_loader = DataLoader(TorchGeometricDataset(negative_combos),
+        neg_data_loader = GeometricDataLoader(TorchGeometricDataset(negative_combos),
                                                            batch_size=1,
                                                            shuffle=True,
                                                            num_workers=2)
@@ -337,7 +375,7 @@ class EVE(Explainer):
     
     def __get_basic_info(self, dataset: Dataset, train=False):
         adj_matrices  = [i.to_numpy_array() for i in dataset.instances]
-        features = [i.features for i in dataset.instances]
+        features = [i.features if isinstance(i, DataInstanceWFeatures) else np.eye(i.graph.number_of_nodes()) for i in dataset.instances]
         y = torch.from_numpy(np.array([i.graph_label for i in dataset.instances]))
         
         if train:
@@ -359,4 +397,17 @@ class EVE(Explainer):
         w = w[a[:,0], a[:,1]]
         
         return Data(x=x, y=label, edge_index=a.T, edge_attr=w)
+    
+    
+    def __get_tuple_permutations(self, tuples_list):
+        permutations_list = []
+        
+        for tup in tuples_list:
+            tup_permutations = list(permutations(tup))
+            permutations_list.extend(tup_permutations)
+        
+        return permutations_list
+
+            
+            
             

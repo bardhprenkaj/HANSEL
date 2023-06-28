@@ -1,16 +1,15 @@
 import os
-import pickle
 import time
 from abc import ABC
+from typing import List
 
-import jsonpickle
-from scipy import rand
+import json
+import numpy as np
 
+from src.dataset.data_instance_base import DataInstance
 from src.dataset.dataset_base import Dataset
-from src.evaluation.evaluation_metric_base import EvaluationMetric
 from src.explainer.explainer_base import Explainer
 from src.oracle.oracle_base import Oracle
-from src.utils.cfgnnexplainer.utils import safe_open
 
 
 class Evaluator(ABC):
@@ -113,16 +112,18 @@ class Evaluator(ABC):
             for inst in self._data.instances:
                 
                 start_time = time.time()
-                counterfactual = self._explainer.explain(inst, self._oracle, self._data)
+                counterfactuals: List[DataInstance] = self._explainer.explain(inst, self._oracle, self._data)
                 end_time = time.time()
-                # giving the same id to the counterfactual and the original instance 
-                counterfactual.id = inst.id
-                self._explanations.append(counterfactual)
+                # giving the same id to the counterfactual and the original instance
+                for i in range(len(counterfactuals)):
+                    counterfactuals[i].id = inst.id 
+
+                self._explanations += counterfactuals
 
                 # The runtime metric is built-in inside the evaluator``
                 self._results['runtime'].append(end_time - start_time)
 
-                self._real_evaluate(inst, counterfactual)
+                self._real_evaluate(inst, counterfactuals)
                 print('evaluated instance with id ', str(inst.id))
         else:
             test_indices = self.dataset.splits[fold_id]['test']
@@ -131,30 +132,34 @@ class Evaluator(ABC):
             for inst in test_set:
                 
                 start_time = time.time()
-                counterfactual = self._explainer.explain(inst, self._oracle, self._data)
+                counterfactuals: List[DataInstance] = self._explainer.explain(inst, self._oracle, self._data)
                 end_time = time.time()
                 # giving the same id to the counterfactual and the original instance 
-                counterfactual.id = inst.id
-                self._explanations.append(counterfactual)
+                for i in range(len(counterfactuals)):
+                    counterfactuals[i].id = inst.id
+                    
+                self._explanations.append(counterfactuals)
 
                 # The runtime metric is built-in inside the evaluator``
                 self._results['runtime'].append(end_time - start_time)
 
-                self._real_evaluate(inst, counterfactual)
+                self._real_evaluate(inst, counterfactuals)
                 print('evaluated instance with id ', str(inst.id))
 
         self.write_results()
 
 
-    def _real_evaluate(self, instance, counterfactual, oracle = None):
+    def _real_evaluate(self, instance, counterfactuals: List[DataInstance], oracle = None):
         is_alt = False
         if (oracle is None):
             is_alt = True
             oracle = self._oracle
 
         for metric in self._evaluation_metrics:
-            m_result = metric.evaluate(instance, counterfactual, oracle)
-            self._results[metric.name].append(m_result)
+            m_results = list()
+            for counterfactual in counterfactuals:
+                m_results.append(metric.evaluate(instance, counterfactual, oracle))
+            self._results[f'{metric.name}'].append(np.mean(m_results))
 
 
     def write_results(self):
@@ -171,5 +176,6 @@ class Evaluator(ABC):
         self._run_number += 1
 
         with open(results_uri, 'w') as results_writer:
-            results_writer.write(jsonpickle.encode(self._results))
+            json.dump(self._results, results_writer)
+            #results_writer.write(jsonpickle.encode(self._results))
 

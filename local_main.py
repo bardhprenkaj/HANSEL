@@ -8,14 +8,14 @@ print(f"Initializing test ensemble")
 
 # config_file_path = './config/steel/meg-set-1/config_tree-cycles-500-32_tc-custom-oracle_meg_fold-0.json'
 # config_file_path = './config/steel/cf2-bbbp/config_bbbp_gcn-tf_cf2_fold-9.json'
-config_file_path = './config/steel/simple_dblp/config_dblp_ae_fold-0.json'
+config_file_path = './config/steel/simple_dblp/config_dyn_tree_cycles_ae_fold-0.json'
 
 print('Creating the evaluation manager.......................................................')
 eval_manager = DynamicEvaluatorManager(config_file_path, run_number=4)
 # print('Generating Synthetic Datasets...........................................................')
 # eval_manager.generate_synthetic_datasets()
 print('Training the oracles......................................................................')
-eval_manager.train_oracles()
+#eval_manager.train_oracles()
 print('Creating the evaluators...................................................................')
 eval_manager.create_evaluators()
 print('Evaluating the explainers..................................................................')

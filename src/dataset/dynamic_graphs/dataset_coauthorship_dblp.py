@@ -113,7 +113,7 @@ class CoAuthorshipDBLP(DynamicDataset):
         # create the data instances for the first timestamp
         temporal_graph[begin] = combined_graph
         labels = self.__get_labels(unique_ego_nets)
-        self.dynamic_graph[begin]._name = f'DBLP@{begin}'
+        self.dynamic_graph[begin]._name = f'{begin}'
         for node, graph in unique_ego_nets.items():
             self.__create_data_instance(id=node, graph=graph,
                                         year=begin, label=labels[node])
@@ -129,7 +129,7 @@ class CoAuthorshipDBLP(DynamicDataset):
             
         for t in range(begin + 1, end + 1):
             # set the name of thedataset
-            self.dynamic_graph[t]._name = f'DBLP@{t}'
+            self.dynamic_graph[t]._name = f'{t}'
             # get the unique ego networks at time t
             unique_ego_nets_at_t = self.__sample_nodes(temporal_graph[t],
                                                        list(unique_ego_nets.keys()),
