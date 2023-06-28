@@ -35,10 +35,29 @@ class GCNEncoder(nn.Module, Encoder):
                  in_channels=1,
                  out_channels=64):
         
-        super(VariationalGCNEncoder, self).__init__()
+        super(GCNEncoder, self).__init__()
+        
         self.conv1 = GCNConv(in_channels, 2 * out_channels)
+        
+        self.init_weights()
     
-                
+    
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv3d):
+                nn.init.kaiming_normal_(m.weight,
+                                        mode='fan_out',
+                                        nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm3d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+
     def forward(self, x, edge_index, edge_weight):
         x = F.relu(self.conv1(x, edge_index, edge_weight))   
         return x
