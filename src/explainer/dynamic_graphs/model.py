@@ -43,9 +43,9 @@ class EVE(Explainer):
                  lr=1e-4,
                  epochs_ae=100,
                  device='cpu',
-                 enc_name='var_gcn_encoder',
+                 enc_name='gcn_encoder',
                  dec_name=None,
-                 autoencoder_name='vgae',
+                 autoencoder_name='gae',
                  config_dict=None,
                  **kwargs) -> None:
         
@@ -181,13 +181,13 @@ class EVE(Explainer):
                     x = item.x.squeeze(dim=0).to(self.device)
                     edge_index = item.edge_index.squeeze(dim=0).to(self.device)
                     edge_attr = item.edge_attr.squeeze(dim=0).to(self.device)
-                    
+                    # get negative edges
+                    neg_edge_index = self.__get_negative_edges(item.num_nodes, edge_index)
                     optimiser.zero_grad()
 
                     z = autoencoder.encode(x, edge_index, edge_attr)
-                    loss = autoencoder.loss(z, pos_edge_index=edge_index)
-                    loss = loss + (1 / item.num_nodes) * autoencoder.kl_loss()
-                     
+                    loss = autoencoder.loss(z, pos_edge_index=edge_index, neg_edge_index=neg_edge_index)
+
                     loss.backward()
                     optimiser.step()
                     
@@ -197,6 +197,11 @@ class EVE(Explainer):
                 
             self.save_autoencoder(autoencoder, cls)
             
+    def __get_negative_edges(self, n_nodes, edge_index):
+        all_possible_edges = set((i, j) for i in range(n_nodes) for j in range(i+1, n_nodes))
+        given_edges = set((edge_index[0][i], edge_index[1][i]) for i in range(edge_index.shape[1]))
+        missing_edges = np.array(list(all_possible_edges - given_edges)).T
+        return missing_edges
             
     def __fit_linear_objective(self, oracle: Oracle, dataset: Dataset):
         X, y = self.__build_contrastive_table(oracle, dataset)

@@ -21,27 +21,14 @@ class CustomVGAE(VGAE, AutoEncoder):
         super().__init__(encoder, decoder)
             
     def loss(self, z: Tensor, **kwargs) -> float:
-        return self.recon_loss(z, **kwargs)
+        loss = self.recon_loss(z, **kwargs)
+        loss = loss + (1 / z.shape[0]) * self.kl_loss()
+        return loss
     
 class CustomGAE(GAE, AutoEncoder):
     
     def __init__(self, encoder: nn.Module, decoder: Optional[nn.Module] = None):
         super().__init__(encoder, decoder)
-        
-    def recon_loss(self, z: Tensor, pos_edge_index: Tensor,
-                   neg_edge_index: Optional[Tensor] = None) -> Tensor:
-        num_nodes = len(z)
-        num_edges = len(pos_edge_index)
-        # if the input graph is not complete
-        pos_loss = -torch.log(self.decoder(z, pos_edge_index, sigmoid=True) + 1e-15).mean()
-
-        neg_loss = 0
-        if num_edges != (num_nodes * (num_nodes - 1)):
-            if neg_edge_index is None:
-                neg_edge_index = negative_sampling(pos_edge_index, z.size(0))
-            neg_loss = -torch.log(1 - self.decoder(z, neg_edge_index, sigmoid=True) + 1e-15).mean()
-            
-        return pos_loss + neg_loss
     
     def loss(self, z: Tensor, **kwargs):
         return self.recon_loss(z, **kwargs)
