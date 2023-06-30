@@ -31,7 +31,5 @@ class DynamicEvaluator(Evaluator):
             print(f'Evaluating for iteration {time - begin_time}')
             self._explainer.iteration = time - begin_time
             self._data = self.dyn_graph[time]
-            super().evaluate()               
-            break 
-                
+            super().evaluate()                               
                 

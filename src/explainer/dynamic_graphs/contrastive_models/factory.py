@@ -3,9 +3,9 @@ from typing import List
 import torch.nn as nn
 
 from src.explainer.dynamic_graphs.contrastive_models.autoencoders import (
-    CustomGAE, CustomVGAE)
+    CustomGAE)
 from src.explainer.dynamic_graphs.contrastive_models.encoders import \
-    GCNEncoder, GraphSAGE, VariationalGCNEncoder
+    GCNEncoder, GraphSAGE
 from src.explainer.dynamic_graphs.contrastive_models.siamese_modules import \
     DenseSiamese
 
@@ -18,10 +18,10 @@ class AEFactory:
                   decoder: nn.Module = None,
                   **kwargs) -> nn.Module:
         
-        if model_name.lower() == 'vgae':
-            return CustomVGAE(encoder=encoder, decoder=decoder)
+        """if model_name.lower() == 'vgae':
+            return CustomVGAE(encoder=encoder, decoder=decoder)"""
         
-        elif model_name.lower() == 'gae':
+        if model_name.lower() == 'gae':
             return CustomGAE(encoder=encoder, decoder=decoder)
 
         else:
@@ -32,9 +32,7 @@ class AEFactory:
                     in_channels=1,
                     out_channels=64,
                     **kwargs) -> nn.Module:
-        if name.lower() == 'var_gcn_encoder':
-            return VariationalGCNEncoder(in_channels=in_channels, out_channels=out_channels)
-        elif name.lower() == 'gcn_encoder':
+        if name.lower() == 'gcn_encoder':
             return GCNEncoder(in_channels=in_channels, out_channels=out_channels)
         elif name.lower() == 'graph_sage':
             return GraphSAGE(in_channels=in_channels, hidden_dim=out_channels)

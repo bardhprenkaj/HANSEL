@@ -24,10 +24,10 @@ class DynamicOracle(Oracle):
                         
             
     def _real_predict(self, data_instance):
-        return self.base_oracle._real_predict(data_instance)
+        return self.base_oracle.predict(data_instance)
     
     def _real_predict_proba(self, data_instance):
-        return self.base_oracle._real_predict_proba(data_instance)
+        return self.base_oracle.predict_proba(data_instance)
     
     def embedd(self, instance):
         return instance

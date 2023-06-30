@@ -12,7 +12,7 @@
             "parameters": {
                 "begin_time": 2000,
                 "end_time": 2003,
-                "num_instances_per_snapshot": 1000,
+                "num_instances_per_snapshot": 100,
                 "n_nodes": 28,
                 "nodes_in_cycle": 7
             } 
@@ -34,12 +34,15 @@
     ],
     "explainers": [
         {
-            "name": "eve",
+            "name": "dygrace",
             "parameters": { 
                 "in_channels": 4,
                 "out_channels": 4,
-                "epochs_ae": 100,
-                "fold_id": 5
+                "epochs_ae": 20,
+                "fold_id": 5,
+                "lr": 1e-3,
+                "autoencoder_name":"gae",
+                "encoder_name": "gcn_encoder"
             } 
         }
     ],

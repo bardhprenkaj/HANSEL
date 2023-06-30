@@ -3,7 +3,7 @@ from abc import ABC, abstractclassmethod
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv, SAGEConv
+from torch_geometric.nn import GCNConv, SAGEConv, GCN, GAT
 
 
 class Encoder(ABC):
@@ -12,6 +12,7 @@ class Encoder(ABC):
     def encode(self, graph, edge_index, edge_attr, **kwargs):
         pass
 
+    
 
 class GraphSAGE(nn.Module):
     def __init__(self, input_dim, hidden_dim):
@@ -29,7 +30,7 @@ class GraphSAGE(nn.Module):
         return x
 
 
-class GCNEncoder(nn.Module, Encoder):
+class GCNEncoder(nn.Module):
     
     def __init__(self,
                  in_channels=1,
@@ -38,9 +39,14 @@ class GCNEncoder(nn.Module, Encoder):
         super(GCNEncoder, self).__init__()
         
         self.conv1 = GCNConv(in_channels, 2 * out_channels)
+        self.conv2 = GCNConv(2 * out_channels, 2 * out_channels)
         
         self.init_weights()
     
+    def forward(self, x, edge_index, edge_weight):
+        x = F.relu(self.conv1(x, edge_index=edge_index, edge_weight=edge_weight))
+        x = F.relu(self.conv2(x, edge_index=edge_index, edge_weight=edge_weight))
+        return x
     
     def init_weights(self):
         for m in self.modules():
@@ -57,39 +63,6 @@ class GCNEncoder(nn.Module, Encoder):
                 nn.init.normal_(m.weight, 0, 0.01)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
-
-    def forward(self, x, edge_index, edge_weight):
-        x = F.relu(self.conv1(x, edge_index, edge_weight))   
-        return x
-    
-    def encode(self, x, edge_index, edge_weight):
-        with torch.no_grad():
-            self.forward(x, edge_index, edge_weight)
-    
-    def set_training(self, training):
-        self.training = training
-    
-class VariationalGCNEncoder(nn.Module):
-    
-    def __init__(self,
-                 in_channels=1,
-                 out_channels=64):
-        
-        super(VariationalGCNEncoder, self).__init__()
-        self.conv1 = GCNConv(in_channels, 2 * out_channels)
-        self.conv2 = GCNConv(2 * out_channels, 4 * out_channels)
-        
-        self.conv_mu = GCNConv(4 * out_channels, out_channels)
-        self.conv_logstd = GCNConv(4 * out_channels, out_channels)
-                
-    def forward(self, x, edge_index, edge_weight):
-        x = F.relu(self.conv1(x, edge_index, edge_weight))
-        x = F.relu(self.conv2(x, edge_index, edge_weight))
-        
-        mu = self.conv_mu(x, edge_index, edge_weight)
-        sigma = self.conv_logstd(x, edge_index, edge_weight)
-
-        return mu, sigma
-    
+                    
     def set_training(self, training):
         self.training = training
