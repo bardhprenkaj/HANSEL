@@ -303,13 +303,14 @@ class ExplainerFactory:
             batch_size = explainer_parameters.get('batch_size', 24)
             lr = explainer_parameters.get('lr', 1e-3)
             epochs_ae = explainer_parameters.get('epochs_ae', 100)
+            top_k_cf = explainer_parameters.get('top_k_cf', 5)
             
             enc_name = explainer_parameters.get('encoder_name', 'var_gcn_encoder')
             dec_name = explainer_parameters.get('decoder_name', None)
             autoencoder_name = explainer_parameters.get('autoencoder_name', 'vgae')
                
             return self.get_dygrace(fold_id, num_classes, in_channels, out_channels, batch_size,
-                                    lr, epochs_ae, enc_name, dec_name, autoencoder_name,
+                                    lr, epochs_ae, enc_name, dec_name, autoencoder_name, top_k_cf,
                                     config_dict=explainer_dict)
         else:
             raise ValueError('''The provided explainer name does not match any explainer provided 
@@ -317,7 +318,7 @@ class ExplainerFactory:
             
             
     def get_dygrace(self, fold_id, num_classes, in_channels, out_channels, batch_size,
-                    lr, epochs_ae, enc_name, dec_name, autoencoder_name,
+                    lr, epochs_ae, enc_name, dec_name, autoencoder_name, top_k_cf,
                     config_dict=None):
         
         result = DyGRACE(id=self._explainer_id_counter,
@@ -332,6 +333,7 @@ class ExplainerFactory:
                      enc_name=enc_name,
                      dec_name=dec_name,
                      autoencoder_name=autoencoder_name,
+                     top_k_cf=top_k_cf,
                      config_dict=config_dict)
         
         self._explainer_id_counter += 1

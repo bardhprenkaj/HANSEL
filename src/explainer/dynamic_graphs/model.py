@@ -37,6 +37,7 @@ class DyGRACE(Explainer):
                  enc_name='gcn_encoder',
                  dec_name=None,
                  autoencoder_name='gae',
+                 top_k_cf=5,
                  config_dict=None,
                  **kwargs) -> None:
         
@@ -71,7 +72,7 @@ class DyGRACE(Explainer):
         
         self.EPS = 20
         
-        self.K = 5
+        self.K = top_k_cf
 
         
         
