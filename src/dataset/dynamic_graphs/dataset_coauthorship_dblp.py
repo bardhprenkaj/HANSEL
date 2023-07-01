@@ -1,4 +1,5 @@
-from src.dataset.data_instance_features import DataInstanceWFeaturesAndWeights
+from src.dataset.data_instance_base import DataInstance
+from src.dataset.data_instance_features import DataInstanceWFeatures, DataInstanceWFeaturesAndWeights
 from src.dataset.dataset_base import Dataset
 from src.dataset.dynamic_graphs.dataset_dynamic import DynamicDataset
 
@@ -76,7 +77,7 @@ class CoAuthorshipDBLP(DynamicDataset):
                         if G.has_edge(graph[i], graph[j]):
                             G[graph[i]][graph[j]]['weight'] += 1
                         else:
-                            G.add_edge(graph[i], graph[j], weight=1)
+                            G.add_edge(graph[i], graph[j], weight=1) 
                 # year -> entire graph of coauthor simplices
                 self.unprocessed_data[row[0]] = G
         
@@ -143,12 +144,11 @@ class CoAuthorshipDBLP(DynamicDataset):
                       
     
     def __create_data_instance(self, id: int, graph: nx.Graph, year: int, label: float):
-        instance = DataInstanceWFeaturesAndWeights(id=id)
+        instance = DataInstance(id=id)
         instance.name = f'ego_network_for_node={id}'
-        instance.weights = nx.to_numpy_array(graph)
-        instance.features = np.random.rand(graph.number_of_nodes(), self.features_dim)
         instance.graph = graph
         instance.graph_label = label
+        instance = self.__generate_node_features(instance)
         print(f'Adding DataInstance with id = {id}')
         self.dynamic_graph[year].instances.append(instance)
     
@@ -195,6 +195,36 @@ class CoAuthorshipDBLP(DynamicDataset):
             
         return  self.__in_percentile(weight_dict)
 
+
+    def __generate_node_features(self, instance: DataInstance) -> DataInstanceWFeaturesAndWeights:
+        graph = instance.graph
+        # Calculate the betweenness centrality
+        betweenness_centrality = nx.betweenness_centrality(graph)
+        # Calculate the closeness centrality
+        closeness_centrality = nx.closeness_centrality(graph)
+        # Calculate the harmonic centrality
+        harmonic_centrality = nx.harmonic_centrality(graph)
+        # Calculate the clustering coefficient
+        clustering_coefficient = nx.clustering(graph)
+        # stack the above calculations and transpose the matrix
+        # the new dimensionality is num_nodes x 4
+        features = np.stack((list(betweenness_centrality.values()),
+                             list(closeness_centrality.values()),
+                             list(harmonic_centrality.values()),
+                             list(clustering_coefficient.values())), axis=0).T
+        # copy the instance information and set the node features
+        new_instance = DataInstanceWFeatures(id=instance.id)
+        new_instance.from_numpy_matrix(nx.adjacency_matrix(graph))
+        new_instance.features = features
+        new_instance.graph_label = instance.graph_label
+        new_instance.graph_dgl = instance.graph_dgl
+        new_instance.edge_labels = instance.edge_labels
+        new_instance.node_labels = instance.node_labels
+        new_instance.name = instance.name
+        new_instance.weights = nx.to_numpy_array(graph)
+
+        # return the new instance with features
+        return new_instance
     
         
         

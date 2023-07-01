@@ -158,7 +158,7 @@ class DyGRACE(Explainer):
         if os.path.exists(constrastive_learner_path):
             self.contrastive_learner = joblib.load(constrastive_learner_path)
         else:
-            indices = dataset.get_split_indices()[self.fold_id]['train'] 
+            indices = dataset.get_split_indices()[self.fold_id]['train']
             self.__fit_linear_objective(oracle, dataset, indices, use_oracle=True)
                
     def __fit_ae(self, oracle: Oracle, dataset: Dataset):
@@ -206,15 +206,12 @@ class DyGRACE(Explainer):
         inference_dataset.instances = [instance] + counterfactuals
         
         # update the contrastive learner
-        self.__fit_linear_objective(oracle, inference_dataset, list(range(len(inference_dataset.instances))), use_oracle=False, partial_fit=True)
+        self.__fit_linear_objective(oracle, inference_dataset, list(range(len(inference_dataset.instances))), use_oracle=False)
             
-    def __fit_linear_objective(self, oracle: Oracle, dataset: Dataset, indices, use_oracle=False, partial_fit=False):
+    def __fit_linear_objective(self, oracle: Oracle, dataset: Dataset, indices, use_oracle=False):
         X, y = self.__build_contrastive_table(oracle, dataset, indices, use_oracle=use_oracle)
         if len(X):
-            if partial_fit:
-                self.contrastive_learner.fit(X,y)
-            else:
-                self.contrastive_learner.partial_fit(X,y)
+            self.contrastive_learner.fit(X,y)
             print(f'Training R2 = {self.contrastive_learner.score(X, y)}')
             self.save_constrastive_learner()
      
@@ -264,7 +261,7 @@ class DyGRACE(Explainer):
                         
                 rows['instance'] += [instance.id] * len(self.autoencoders)
                 
-                similarity = 1 / (1 + GraphEditDistanceMetric().evaluate(search_for_instance, instance))
+                similarity = 1 / (1 + GraphEditDistanceMetric().evaluate(search_for_instance, [instance])[0])
                 rows['sim'] += [similarity] * len(self.autoencoders)
             
         return rows
@@ -302,7 +299,7 @@ class DyGRACE(Explainer):
                         else:
                             curr_row['rec_f'] = rec_error
                     # measure the similarity
-                    similarity = 1 / (1 + GraphEditDistanceMetric().evaluate(anchor_instance, instance))
+                    similarity = 1 / (1 + GraphEditDistanceMetric().evaluate(anchor_instance, [instance])[0])
                     curr_row[f'sim_{i}'] = similarity
                 # set the class (either positive or negative)
                 # and the indices of the tuples for reference purposes
@@ -335,27 +332,23 @@ class DyGRACE(Explainer):
     
     def __contrastive_learning(self, oracle: Oracle, dataset: Dataset, indices: np.array, use_oracle=True) -> Tuple[GeometricDataLoader, GeometricDataLoader]:
         # get only the training data to avoid going out of bounds
-        instances = np.array(dataset.instances, dtype=object)[indices]
-        
+        data = {}
         split_indices = {label: [] for label in range(self.num_classes)}
-        for i, instance in enumerate(instances):
+        for i in indices:
+            instance = dataset.get_instance(i)
             if use_oracle:
                 split_indices[oracle.predict(instance)].append(i)
             else:
                 split_indices[instance.graph_label].append(i)
+            # transform the entire dataset into torch geometric Data objects
+            data[i] = self.__to_geometric(instance, label=int(i))
             
         class_indices = sorted(list(split_indices.values()))
-        
-        # transform the entire dataset into torch geometric Data objects
-        data = []
-        for i in indices:
-            data.append(self.__to_geometric(instances[i], label=int(i)))
         # generate positive and negative samples
         combos = list(product(*class_indices))
         # filter the combinations to keep only the positive tuples
         positive_combos = list([t for t in combos if len(set(t)) == len(t)])
-        positive_combos = set(self.__get_tuple_permutations(positive_combos))
-        
+        positive_combos = set(self.__get_tuple_permutations(positive_combos))        
         # initialise the list of negative tuples
         _max = 0
         for indices in class_indices:
@@ -370,18 +363,23 @@ class DyGRACE(Explainer):
         if not positive_combos or not negative_combos:
             return None, None
         
+        positives = []
         for i, positive_index in enumerate(positive_combos):
-            positive_combos[i] = list(itemgetter(*positive_index)(data))
+            positives.append(list(itemgetter(*positive_index)(data)))
             
+        negatives = []
         for i, negative_index in enumerate(negative_combos):
-            negative_combos[i] = list(itemgetter(*negative_index)(data))
+            # the negative indices might be outside of the current view
+            # of indices. in these cases, just don't get them
+            if negative_index[0] in data and negative_index[1] in data:
+                negatives.append(list(itemgetter(*negative_index)(data)))
                     
-        pos_data_loader = GeometricDataLoader(TorchGeometricDataset(positive_combos),
+        pos_data_loader = GeometricDataLoader(TorchGeometricDataset(positives),
                                       batch_size=1,
                                       shuffle=True,
                                       num_workers=2)
         
-        neg_data_loader = GeometricDataLoader(TorchGeometricDataset(negative_combos),
+        neg_data_loader = GeometricDataLoader(TorchGeometricDataset(negatives),
                                                            batch_size=1,
                                                            shuffle=True,
                                                            num_workers=2)
