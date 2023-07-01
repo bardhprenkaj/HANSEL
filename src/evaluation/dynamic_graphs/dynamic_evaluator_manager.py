@@ -14,6 +14,7 @@ class DynamicEvaluatorManager(EvaluatorManager):
     
     def __init__(self,
                  config_file_path,
+                 K=5,
                  run_number=0,
                  dataset_factory: DatasetFactory = None,
                  embedder_factory: EmbedderFactory = None,
@@ -21,7 +22,7 @@ class DynamicEvaluatorManager(EvaluatorManager):
                  explainer_factory: ExplainerFactory = None,
                  evaluation_metric_factory: EvaluationMetricFactory = None) -> None:
         
-        super().__init__(config_file_path, run_number,
+        super().__init__(config_file_path, K, run_number,
                          dataset_factory, embedder_factory,
                          oracle_factory, explainer_factory,
                          evaluation_metric_factory)

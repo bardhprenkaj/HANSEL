@@ -1,11 +1,13 @@
+from abc import ABC, abstractmethod
+from typing import List
+
+import networkx as nx
+
 from src.dataset.data_instance_base import DataInstance
 from src.dataset.dataset_base import Dataset
 from src.explainer.explainer_base import Explainer
 from src.oracle.oracle_base import Oracle
 
-import networkx as nx
-
-from abc import ABC, abstractmethod
 
 class EvaluationMetric(ABC):
 
@@ -23,6 +25,6 @@ class EvaluationMetric(ABC):
         self._name = new_name
 
     @abstractmethod
-    def evaluate(self, instance_1 : DataInstance, instance_2 : DataInstance, oracle : Oracle=None):
+    def evaluate(self, instance_1 : DataInstance, other_instances : List[DataInstance], oracle : Oracle=None):
         pass
     

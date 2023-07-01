@@ -1,9 +1,9 @@
 from functools import lru_cache
+from typing import List
 
-from src.evaluation.evaluation_metric_base import EvaluationMetric
 from src.dataset.data_instance_base import DataInstance
+from src.evaluation.evaluation_metric_base import EvaluationMetric
 from src.oracle.oracle_base import Oracle
-from src.evaluation.evaluation_metric_ged import GraphEditDistanceMetric
 
 
 class SmilesLevenshteinMetric(EvaluationMetric):
@@ -15,8 +15,8 @@ class SmilesLevenshteinMetric(EvaluationMetric):
         super().__init__(config_dict)
         self._name = 'Smiles-Levenshtein'
 
-    def evaluate(self, instance_1: DataInstance, instance_2: DataInstance, oracle: Oracle = None):
-        return self.lev_dist(instance_1.smiles, instance_2.smiles)
+    def evaluate(self, instance_1: DataInstance, other_instances: List[DataInstance], oracle: Oracle = None):
+        return [self.lev_dist(instance_1.smiles, instance.smiles) for instance in other_instances]
 
     def lev_dist(self, a, b):
         '''

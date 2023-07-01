@@ -1,5 +1,7 @@
-from src.evaluation.evaluation_metric_base import EvaluationMetric
+from typing import List
+
 from src.dataset.data_instance_base import DataInstance
+from src.evaluation.evaluation_metric_base import EvaluationMetric
 from src.oracle.oracle_base import Oracle
 
 
@@ -12,7 +14,7 @@ class OracleAccuracyMetric(EvaluationMetric):
         super().__init__(config_dict)
         self._name = 'Oracle_Accuracy'
 
-    def evaluate(self, instance_1: DataInstance, instance_2: DataInstance, oracle: Oracle):
+    def evaluate(self, instance_1: DataInstance, other_instances: List[DataInstance], oracle: Oracle):
 
         predicted_label_instance_1 = oracle.predict(instance_1)
         oracle._call_counter -= 1

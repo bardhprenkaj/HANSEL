@@ -1,7 +1,9 @@
-from src.evaluation.evaluation_metric_base import EvaluationMetric
+from typing import List
+
 from src.dataset.data_instance_base import DataInstance
-from src.oracle.oracle_base import Oracle
+from src.evaluation.evaluation_metric_base import EvaluationMetric
 from src.evaluation.evaluation_metric_ged import GraphEditDistanceMetric
+from src.oracle.oracle_base import Oracle
 
 
 class CorrectnessMetric(EvaluationMetric):
@@ -13,14 +15,16 @@ class CorrectnessMetric(EvaluationMetric):
         self._name = 'Correctness'
         self._ged = GraphEditDistanceMetric()
 
-    def evaluate(self, instance_1: DataInstance, instance_2: DataInstance, oracle: Oracle):
-
-        label_instance_1 = oracle.predict(instance_1)
-        label_instance_2 = oracle.predict(instance_2)
-        oracle._call_counter -= 2
-
-        ged = self._ged.evaluate(instance_1, instance_2, oracle)
-
-        result = 1 if (label_instance_1 != label_instance_2) and (ged != 0) else 0
+    def evaluate(self, instance_1: DataInstance, other_instances: List[DataInstance], oracle: Oracle):
+        oracle_results = list()
         
-        return result
+        label_instance_1 = oracle.predict(instance_1)
+        oracle._call_counter -= 1
+        for instance in other_instances:
+            label_instance_2 = oracle.predict(instance)
+            oracle._call_counter -= 1
+            oracle_results.append(True if label_instance_1 != label_instance_2 else False)
+                
+        geds = self._ged.evaluate(instance_1, other_instances, oracle)
+
+        return 1 if any(oracle_results) and any(geds) else 0

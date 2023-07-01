@@ -14,7 +14,7 @@ from src.oracle.oracle_base import Oracle
 
 class Evaluator(ABC):
 
-    def __init__(self, id, data: Dataset, oracle: Oracle, explainer: Explainer, evaluation_metrics, results_store_path, run_number=0) -> None:
+    def __init__(self, id, data: Dataset, oracle: Oracle, explainer: Explainer, evaluation_metrics, results_store_path, K=5, run_number=0) -> None:
         super().__init__()
         self._id = id
         self._name = 'Evaluator_for_' + explainer.name + '_using_' + oracle.name
@@ -26,6 +26,7 @@ class Evaluator(ABC):
         self._evaluation_metrics = evaluation_metrics
         self._run_number = run_number
         self._explanations = []
+        self._K = K
 
         # Building the config file to write into disk
         evaluator_config = {'dataset': data._config_dict, 'oracle': oracle._config_dict, 'explainer': explainer._config_dict, 'metrics': []}
@@ -34,6 +35,14 @@ class Evaluator(ABC):
         # creatig the results dictionary with the basic info
         self._results = {'config':evaluator_config, 'runtime': []}
 
+    @property
+    def K(self):
+        return self._K
+    
+    @K.setter
+    def K(self, new_K):
+        self._K = new_K
+    
     @property
     def id(self):
         return self._id
@@ -156,10 +165,9 @@ class Evaluator(ABC):
             oracle = self._oracle
 
         for metric in self._evaluation_metrics:
-            m_results = list()
-            for counterfactual in counterfactuals:
-                m_results.append(metric.evaluate(instance, counterfactual, oracle))
-            self._results[f'{metric.name}'].append(np.mean(m_results))
+            for k in range(1, self._K + 1):
+                self._results[f'{metric.name}@{k}'] = self._results.get(f'{metric.name}@{k}', [])
+                self._results[f'{metric.name}@{k}'].append(metric.evaluate(instance, counterfactuals[:k], oracle))
 
 
     def write_results(self):

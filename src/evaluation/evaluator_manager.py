@@ -10,11 +10,11 @@ import jsonpickle
 
 class EvaluatorManager:
 
-    def __init__(self, config_file_path, run_number=0, 
+    def __init__(self, config_file_path, K: int = 5, run_number=0, 
                     dataset_factory: DatasetFactory=None, 
                     embedder_factory: EmbedderFactory=None, 
                     oracle_factory: OracleFactory=None, 
-                    explainer_factory: ExplainerFactory=None, 
+                    explainer_factory: ExplainerFactory=None,
                     evaluation_metric_factory: EvaluationMetricFactory=None) -> None:
         
         # Check that the path to the config file exists
@@ -32,6 +32,7 @@ class EvaluatorManager:
         self._output_store_path = None
         self._evaluation_metric_factory = None
         self._run_number = run_number
+        self._K = K
 
         # iterate over the store paths and initialize the factories
         for store_path in self._config_dict['store_paths']:
@@ -134,6 +135,15 @@ class EvaluatorManager:
     def evaluators(self, new_evaluators_list):
         self._evaluators = new_evaluators_list
         
+        
+    @property
+    def K(self):
+        return self._K
+    
+    @K.setter
+    def K(self, new_K):
+        self._K = new_K
+        
 
     def generate_synthetic_datasets(self):
         """Generates the synthetic datasets and stores them on disk, allowing them to be loaded later
@@ -218,7 +228,7 @@ class EvaluatorManager:
 
                     # Creating the evaluator
                     evaluator = Evaluator(evaluator_id, dataset, oracle, explainer, self.evaluation_metrics,
-                                             self._output_store_path, self._run_number)
+                                             self._output_store_path, self._K, self._run_number)
 
                     # Adding the evaluator to the evaluator's list
                     self.evaluators.append(evaluator)
