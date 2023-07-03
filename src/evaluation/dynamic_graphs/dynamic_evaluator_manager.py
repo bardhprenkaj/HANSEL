@@ -22,10 +22,15 @@ class DynamicEvaluatorManager(EvaluatorManager):
                  explainer_factory: ExplainerFactory = None,
                  evaluation_metric_factory: EvaluationMetricFactory = None) -> None:
         
-        super().__init__(config_file_path, K, run_number,
-                         dataset_factory, embedder_factory,
-                         oracle_factory, explainer_factory,
-                         evaluation_metric_factory)
+        super().__init__(config_file_path=config_file_path,
+                         K=K,
+                         run_number=run_number,
+                         dataset_factory=dataset_factory,
+                         embedder_factory=embedder_factory,
+                         oracle_factory=oracle_factory,
+                         explainer_factory=explainer_factory,
+                         evaluation_metric_factory=evaluation_metric_factory)
+        
         
     def create_evaluators(self):
         """Creates one evaluator for each combination of dataset-oracle-explainer using the chosen metrics
@@ -70,7 +75,7 @@ class DynamicEvaluatorManager(EvaluatorManager):
                     # Creating the evaluator
                     evaluator = DynamicEvaluator(evaluator_id, dataset,
                                                  oracle, explainer, self.evaluation_metrics,
-                                                 self._output_store_path, self._run_number)
+                                                 self._output_store_path, self._run_number, self.K)
 
                     # Adding the evaluator to the evaluator's list
                     self.evaluators.append(evaluator)

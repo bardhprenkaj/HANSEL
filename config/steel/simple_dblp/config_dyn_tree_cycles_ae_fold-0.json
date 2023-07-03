@@ -38,8 +38,8 @@
             "parameters": { 
                 "in_channels": 4,
                 "out_channels": 4,
-                "epochs_ae": 20,
-                "fold_id": 5,
+                "epochs_ae": 50,
+                "fold_id": 0,
                 "lr": 1e-3,
                 "autoencoder_name":"gae",
                 "encoder_name": "gcn_encoder"

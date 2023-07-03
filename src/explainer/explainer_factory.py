@@ -303,7 +303,7 @@ class ExplainerFactory:
             batch_size = explainer_parameters.get('batch_size', 24)
             lr = explainer_parameters.get('lr', 1e-3)
             epochs_ae = explainer_parameters.get('epochs_ae', 100)
-            top_k_cf = explainer_parameters.get('top_k_cf', 5)
+            top_k_cf = explainer_parameters.get('top_k_cf', 10)
             
             enc_name = explainer_parameters.get('encoder_name', 'var_gcn_encoder')
             dec_name = explainer_parameters.get('decoder_name', None)

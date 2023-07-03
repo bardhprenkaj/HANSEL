@@ -27,7 +27,7 @@ class Evaluator(ABC):
         self._run_number = run_number
         self._explanations = []
         self._K = K
-
+        print(f'My K is = {self._K}')
         # Building the config file to write into disk
         evaluator_config = {'dataset': data._config_dict, 'oracle': oracle._config_dict, 'explainer': explainer._config_dict, 'metrics': []}
         for metric in evaluation_metrics:
@@ -133,7 +133,6 @@ class Evaluator(ABC):
                 self._results['runtime'].append(end_time - start_time)
 
                 self._real_evaluate(inst, counterfactuals)
-                print('evaluated instance with id ', str(inst.id))
         else:
             test_indices = self.dataset.splits[fold_id]['test']
             test_set = [i for i in self.dataset.instances if i.id in test_indices]
@@ -144,8 +143,8 @@ class Evaluator(ABC):
                 counterfactuals: List[DataInstance] = self._explainer.explain(inst, self._oracle, self._data)
                 end_time = time.time()
                 # giving the same id to the counterfactual and the original instance 
-                for i in range(len(counterfactuals)):
-                    counterfactuals[i].id = inst.id
+                """for i in range(len(counterfactuals)):
+                    counterfactuals[i].id = inst.id"""
                     
                 self._explanations.append(counterfactuals)
 
@@ -163,7 +162,7 @@ class Evaluator(ABC):
         if (oracle is None):
             is_alt = True
             oracle = self._oracle
-
+            
         for metric in self._evaluation_metrics:
             for k in range(1, self._K + 1):
                 self._results[f'{metric.name}@{k}'] = self._results.get(f'{metric.name}@{k}', [])

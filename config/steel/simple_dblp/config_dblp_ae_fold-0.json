@@ -21,32 +21,22 @@
     ],
     "oracles": [
         {
-            "name": "dynamic_oracle",
-            "parameters": {
-                "base_oracle" : {
-                    "name": "dblp_coauthorship_custom_oracle", 
-                    "parameters": {
-                        "fit": false,
-                        "percentile": 75
-                    }
-                },
-                "first_train_timestamp": 2000
-                
-            }
-            
+            "name" : "id_oracle",
+            "parameters": {}
         }
     ],
     "explainers": [
         {
             "name": "dygrace",
             "parameters": { 
-                "in_channels": 8,
+                "in_channels": 4,
                 "out_channels": 4,
-                "epochs_ae": 20,
+                "epochs_ae": 150,
                 "fold_id": 0,
-                "lr": 1e-3,
+                "lr": 1e-4,
                 "autoencoder_name":"gae",
-                "encoder_name": "gcn_encoder"
+                "encoder_name": "gcn_encoder",
+                "top_k_cf": 10
             }
         }
     ],

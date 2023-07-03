@@ -6,15 +6,15 @@ from src.dataset.converters.weights_converter import \
     DefaultFeatureAndWeightConverter
 from src.dataset.dataset_base import Dataset
 from src.oracle.dynamic_graphs.dynamic_oracle_base import DynamicOracle
-from src.oracle.oracle_custom_dblp import \
-    DBLPCoAuthorshipCustomOracle
 from src.oracle.embedder_base import Embedder
 from src.oracle.embedder_factory import EmbedderFactory
 from src.oracle.embedder_graph2vec import Graph2vec
 from src.oracle.oracle_asd_custom import ASDCustomOracle
 from src.oracle.oracle_base import Oracle
 from src.oracle.oracle_cf2 import CF2Oracle
+from src.oracle.oracle_custom_dblp import DBLPCoAuthorshipCustomOracle
 from src.oracle.oracle_gcn_tf import TfGCNOracle
+from src.oracle.oracle_id import IDOracle
 from src.oracle.oracle_knn import KnnOracle
 from src.oracle.oracle_node_pt import NodeOracle
 from src.oracle.oracle_node_syn_pt import SynNodeOracle
@@ -106,11 +106,13 @@ class OracleFactory(ABC):
             fold_id = oracle_parameters.get('fold_id', 0)                
             percentile = oracle_parameters.get('percentile', 75)
             fit = oracle_parameters.get('fit', False)
+            first_train_timestamp = oracle_parameters.get('first_train_timestamp', 0)
             
             return self.get_dblp_coauthorship_custom_oracle(dataset,
                                                             percentile=percentile,
                                                             fold_id=fold_id,
                                                             fit=fit,
+                                                            first_train_timestamp=first_train_timestamp,
                                                             config_dict=oracle_dict)
         elif oracle_name == 'dynamic_oracle':
             if 'base_oracle' not in oracle_dict['parameters']:
@@ -129,17 +131,24 @@ class OracleFactory(ABC):
                                            base_oracle,
                                            timestamp=first_train_timestamp,
                                            config_dict=oracle_dict)
+            
+        elif oracle_name == 'id_oracle':
+            return self.get_id_oracle()
         # If the oracle name does not match any oracle in the factory
         else:
             raise ValueError('''The provided oracle name does not match any oracle provided by the factory''')
         
+    def get_id_oracle(self):
+        clf = IDOracle(id=self._oracle_id_counter, oracle_store_path=self._oracle_store_path, config_dict=None)
+        self._oracle_id_counter += 1
+        return clf
     
     def get_dynamic_oracle(self, dataset: Dataset, base_oracle: Oracle, timestamp=-1, config_dict=None):
         clf = DynamicOracle(id=self._oracle_id_counter,
                             base_oracle=base_oracle,
                             oracle_store_path=self._oracle_store_path,
                             config_dict=config_dict)
-        
+        self._oracle_id_counter += 1
         clf.fit(dataset, timestamp=timestamp)
         return clf
         
@@ -148,11 +157,13 @@ class OracleFactory(ABC):
                                             percentile=75,
                                             fold_id=0,
                                             fit=False,
+                                            first_train_timestamp=0,
                                             config_dict=None):
         
         clf = DBLPCoAuthorshipCustomOracle(id=self._oracle_id_counter,
                                            percentile=percentile,
                                            fold_id=fold_id,
+                                           first_train_timestamp=first_train_timestamp,
                                            oracle_store_path=self._oracle_store_path,
                                            config_dict=config_dict)
         self._oracle_id_counter +=1

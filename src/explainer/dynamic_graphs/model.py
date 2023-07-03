@@ -3,7 +3,7 @@ from copy import deepcopy
 from itertools import combinations, permutations, product
 from operator import itemgetter
 from typing import Dict, List, Tuple
-
+import matplotlib.pyplot as plt
 import joblib
 import numpy as np
 import pandas as pd
@@ -96,24 +96,20 @@ class DyGRACE(Explainer):
             df = pd.concat([df, pd.DataFrame(rows)])
                 
         df.rec_cf *= -1
-                        
-        y_pred = self.contrastive_learner.predict(df.values[:,:-1])
-        y_pred = np.where(y_pred == 1)[0]
                 
-        counterfactuals = []
-        if len(y_pred) != 0:
-            y_pred_df = pd.DataFrame(self.contrastive_learner.predict_proba(df.values[:,:-1])[:,1], columns=['probability'])
-            y_pred_df.sort_values(by='probability', ascending=False, inplace=True)
-            
-            best_cf = y_pred_df.index[:self.K]
-                       
-            counterfactuals = set([dataset.get_instance(int(i)) for i in df.values[:,-1][best_cf]])
-            counterfactuals = list(counterfactuals)
-        else:
-            counterfactuals = [instance]
+        y_pred = self.contrastive_learner.predict(df.values[:,:-1])
         
+        factuals = np.where(y_pred == 0)[0]
+        factuals = self.__sample_k(dataset, df) if len(factuals) else [instance]
+        
+        counterfactuals = np.where(y_pred == 1)[0]
+        counterfactuals = self.__sample_k(dataset, df, dim=1) if len(counterfactuals) else [instance]
+
         if self.iteration > 0:
-            self.update(deepcopy(instance), deepcopy(counterfactuals), oracle)            
+            self.update(deepcopy(instance),
+                        deepcopy(counterfactuals),
+                        deepcopy(factuals),
+                        oracle)            
 
         return counterfactuals
         
@@ -130,6 +126,17 @@ class DyGRACE(Explainer):
         # setting the flag to signal the explainer was already trained
         self._fitted = True    
                       
+    def __sample_k(self, dataset: Dataset, df: pd.DataFrame, dim=0):
+        y_pred_df = pd.DataFrame(self.contrastive_learner.predict_proba(df.values[:,:-1])[:,dim], columns=['probability'])
+        y_pred_df.sort_values(by='probability', ascending=False, inplace=True)
+        
+        best = y_pred_df.index[:self.K]
+                                        
+        result = set([dataset.get_instance(int(i)) for i in df.values[:,-1][best]])
+        result = list(result)
+        
+        return result
+    
     def save_autoencoder(self, model, cls):
         try:
             os.mkdir(self.explainer_uri)                    
@@ -166,13 +173,14 @@ class DyGRACE(Explainer):
         for cls, data_loader in enumerate(data_loaders):
             self.__train(data_loader, cls)
             
-    def update(self, instance: DataInstance, counterfactuals: List[DataInstance], oracle):
+    def update(self, instance: DataInstance, counterfactuals: List[DataInstance], factuals: List[DataInstance], oracle):
         # the contrastive learner fails to produce a valid counterfactual
         # in these cases, just save the previous autoencoders and contrastive learner
-        if len(counterfactuals) == 1 and counterfactuals[0] == instance:
+        if len(counterfactuals) == 1 and counterfactuals[0].id == instance.id:
             for cls in range(len(self.autoencoders)):
                 self.save_autoencoder(self.autoencoders[cls], cls)
             self.save_constrastive_learner()
+            print(f'Failed to produce a counterfactual for instance with id = {instance.id}')
             return
         
         x, edge_index, edge_weights, _, truth = self.__expand(self.__to_geometric(instance, label=torch.Tensor([-1])))
@@ -183,27 +191,35 @@ class DyGRACE(Explainer):
         factual_label = np.argmin(rec_errors)
         # transform the list of counterafactuals in a torch geometric data loader
         counterfactuals_geometric = [self.__to_geometric(counterfactual, label=torch.Tensor([-1])) for counterfactual in counterfactuals]
-        data_loader = GeometricDataLoader(TorchGeometricDataset(counterfactuals_geometric), batch_size=1, shuffle=True, num_workers=2)
+        cf_data_loader = GeometricDataLoader(TorchGeometricDataset(counterfactuals_geometric), batch_size=1, shuffle=True, num_workers=2)
+        # transform the list of factuals in a torch geometric data loader
+        factuals_geometric = [self.__to_geometric(factual, label=torch.Tensor([-1])) for factual in factuals]
+        f_data_loader = GeometricDataLoader(TorchGeometricDataset(factuals_geometric), batch_size=1, shuffle=True, num_workers=2)
         # set the labels to the instance and counterfactuals
         # in a semi-supervised fashion via the learned autoencoders
         instance.graph_label = factual_label
         # the label of the counterfactuals is any one different from factual_label
         for i in range(len(counterfactuals)):
             counterfactuals[i].graph_label = 1 - factual_label
+        for i in range(len(factuals)):
+            factuals[i].graph_label = factual_label
         # with the counterfactuals found now:
         # 1. train the counterfactual autoencoder and minimise the reconstruction error
         # 2. train the factual autoencoder and maximise the reconstruction error
         for i in range(len(self.autoencoders)):
             if i != factual_label:
-                self.__train(data_loader, i)
-            #else:
-            #    self.__train(data_loader, i, contrastive=False)
+                self.__train(cf_data_loader, i)
+                self.__train(f_data_loader, i, maximise=True)
+            else:
+                self.__train(cf_data_loader, i, maximise=True)
+                self.__train(f_data_loader, i)
+            
             self.save_autoencoder(self.autoencoders[i], i)
         # update the linear objective
         oracle = None # we don't need the oracle in the next iterations
         # build a dummy dataset with the instance and its counterfactuals
         inference_dataset = Dataset(id=-1)
-        inference_dataset.instances = [instance] + counterfactuals
+        inference_dataset.instances = [instance] + counterfactuals + factuals
         
         # update the contrastive learner
         self.__fit_linear_objective(oracle, inference_dataset, list(range(len(inference_dataset.instances))), use_oracle=False)
@@ -239,30 +255,29 @@ class DyGRACE(Explainer):
         
         rows = {'rec_cf': [], 'rec_f': [], 'sim': [], 'instance': []}
         
+        x, edge_index, edge_weights, _, truth = self.__expand(self.__to_geometric(search_for_instance, label=torch.Tensor([-1])))
         with torch.no_grad():
-            
+            rec_errors = [autoencoder.loss(autoencoder.encode(x, edge_index, edge_weights), truth) for autoencoder in self.autoencoders]
+            # the lowest reconstruction erorr will represent the factual autoencoder    
+            factual_label = np.argmin(rec_errors)        
+                    
             for data in data_loader:
                 x, edge_index, edge_attr, label, truth = self.__expand(data)
-
-                instance = dataset.get_instance(label.item())                
-                # get the combinations of autoencoders to
-                # calculate factual and counterfactual reconstruction errors
-                combos_autoencoders = combinations(self.autoencoders, r=len(self.autoencoders))
-                combos_autoencoders = set(self.__get_tuple_permutations(combos_autoencoders))
-
-                for f_ae, cf_ae in combos_autoencoders:
-                    z = f_ae.encode(x, edge_index=edge_index, edge_weight=edge_attr)
-                    rec_error = f_ae.loss(z, truth).item()
-                    rows['rec_f'].append(rec_error)
+                # if the current graph isn't a single isolated node
+                if edge_index.shape[-1] != 0:
+                    instance = dataset.get_instance(label.item())                
                     
-                    z = cf_ae.encode(x, edge_index=edge_index, edge_weight=edge_attr)
-                    rec_error = cf_ae.loss(z, truth).item()
-                    rows['rec_cf'].append(rec_error)
-                        
-                rows['instance'] += [instance.id] * len(self.autoencoders)
-                
-                similarity = 1 / (1 + GraphEditDistanceMetric().evaluate(search_for_instance, [instance])[0])
-                rows['sim'] += [similarity] * len(self.autoencoders)
+                    for i, autoencoder in enumerate(self.autoencoders):
+                        if i != factual_label:
+                            z = autoencoder.encode(x, edge_index, edge_attr)
+                            rec_error = autoencoder.loss(z, truth).item()
+                            rows['rec_cf'].append(rec_error)
+                            rows['rec_f'].append(rec_errors[factual_label].item())
+                            
+                            rows['instance'] += [label.item()]
+                    
+                    similarity = 1 / (1 + GraphEditDistanceMetric().evaluate(search_for_instance, [instance])[0])
+                    rows['sim'] += [similarity]
             
         return rows
         
@@ -317,8 +332,8 @@ class DyGRACE(Explainer):
             # get instance from the dataset
             instance = dataset.get_instance(i)
             # if we're not using the oracle, then just put 0 as a dummy key
-            label = oracle.predict(instance) if use_oracle else 0                   
-            data_dict_cls[label].append(self.__to_geometric(instance, label=label if not index_label else int(i)))
+            label = oracle.predict(instance) if use_oracle else 0
+            data_dict_cls[label].append(self.__to_geometric(instance, label=(label if not index_label else int(i))))
             
         data_loaders = []
         for cls in data_dict_cls.keys():
@@ -411,7 +426,7 @@ class DyGRACE(Explainer):
 
         a = torch.nonzero(adj)
         w = w[a[:,0], a[:,1]]
-        
+
         return Data(x=x, y=label, edge_index=a.T, edge_attr=w)
     
     def __get_tuple_permutations(self, tuples_list):
@@ -424,7 +439,7 @@ class DyGRACE(Explainer):
         return permutations_list
     
     
-    def __train(self, data_loader: GeometricDataLoader, cls: int):
+    def __train(self, data_loader: GeometricDataLoader, cls: int, maximise=False):
         optimiser = torch.optim.Adam(self.autoencoders[cls].parameters(), lr=self.lr)
             
         for epoch in range(self.epochs_ae):
@@ -437,7 +452,8 @@ class DyGRACE(Explainer):
 
                 z = self.autoencoders[cls].encode(x, edge_index=edge_index, edge_weight=edge_weight)
                 loss = self.autoencoders[cls].loss(z, truth)
-                                                
+                if maximise:
+                    loss = (1 / loss * self.EPS)               
                 loss.backward()
                 optimiser.step()
                                     
