@@ -42,7 +42,9 @@ class GraphPairDataset(Dataset):
           graph1 = self.to_geometric(data1)
           graph2 = self.to_geometric(data2)
           # if we're using the oracle, it means we're training
-          # otherwise, we should consider all the targets as "different"
+          # otherwise, we're at inference time.
+          # At inference, we should consider all the targets as "different"
+          # and potential counterfactuals
           if self.oracle:
             label = 1 if self.oracle.predict(data1) != self.oracle.predict(data2) else 0
           else:
@@ -74,4 +76,10 @@ class GraphPairDataset(Dataset):
   
   
 class PairData(Data):
-  pass
+  
+  def __inc__(self, key, value, *args, **kwargs):
+    if key == 'edge_index_s':
+      return self.x_s.size(0)
+    if key == 'edge_index_t':
+      return self.x_t.size(0)
+    return super().__inc__(key, value, *args, **kwargs)
