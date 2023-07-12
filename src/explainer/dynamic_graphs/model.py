@@ -424,7 +424,7 @@ class DyGRACE(Explainer):
         x = torch.from_numpy(features).double()
         w = adj
 
-        a = torch.nonzero(adj)
+        a = torch.nonzero(torch.triu(adj))
         w = w[a[:,0], a[:,1]]
 
         return Data(x=x, y=label, edge_index=a.T, edge_attr=w)

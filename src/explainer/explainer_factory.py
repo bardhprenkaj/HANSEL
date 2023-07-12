@@ -3,6 +3,7 @@ from src.dataset.converters.weights_converter import \
     DefaultFeatureAndWeightConverter
 from src.evaluation.evaluation_metric_factory import EvaluationMetricFactory
 from src.explainer.dynamic_graphs.ada_gce import AdaptiveGCE
+from src.explainer.dynamic_graphs.contrastive_dygrace import ContrastiveDyGRACE
 from src.explainer.dynamic_graphs.model import DyGRACE
 from src.explainer.ensemble.ensemble_factory import EnsembleFactory
 from src.explainer.explainer_base import Explainer
@@ -312,11 +313,49 @@ class ExplainerFactory:
             return self.get_dygrace(fold_id, num_classes, in_channels, out_channels, batch_size,
                                     lr, epochs_ae, enc_name, dec_name, autoencoder_name, top_k_cf,
                                     config_dict=explainer_dict)
+        elif explainer_name == 'contrastive_dygrace':
+            fold_id = explainer_parameters.get('fold_id', 0)
+            num_classes = explainer_parameters.get('num_classes', 2)
+            in_channels = explainer_parameters.get('in_channels', 1)
+            out_channels = explainer_parameters.get('out_channels', 4)
+            batch_size = explainer_parameters.get('batch_size', 24)
+            lr = explainer_parameters.get('lr', 1e-3)
+            epochs_ae = explainer_parameters.get('epochs_ae', 100)
+            top_k_cf = explainer_parameters.get('top_k_cf', 10)
+            
+            enc_name = explainer_parameters.get('encoder_name', 'var_gcn_encoder')
+            dec_name = explainer_parameters.get('decoder_name', None)
+            autoencoder_name = explainer_parameters.get('autoencoder_name', 'vgae')
+               
+            return self.get_contrastive_dygrace(fold_id, num_classes, in_channels, out_channels, batch_size,
+                                    lr, epochs_ae, enc_name, dec_name, autoencoder_name, top_k_cf,
+                                    config_dict=explainer_dict)
         else:
             raise ValueError('''The provided explainer name does not match any explainer provided 
             by the factory''')
             
-            
+    def get_contrastive_dygrace(self, fold_id, num_classes, in_channels, out_channels, batch_size,
+                    lr, epochs_ae, enc_name, dec_name, autoencoder_name, top_k_cf,
+                    config_dict=None):
+        
+        result = ContrastiveDyGRACE(id=self._explainer_id_counter,
+                     explainer_store_path=self._explainer_store_path,
+                     fold_id=fold_id,
+                     num_classes=num_classes,
+                     in_channels=in_channels,
+                     out_channels=out_channels,
+                     batch_size=batch_size,
+                     lr=lr,
+                     epochs_ae=epochs_ae,
+                     enc_name=enc_name,
+                     dec_name=dec_name,
+                     autoencoder_name=autoencoder_name,
+                     top_k_cf=top_k_cf,
+                     config_dict=config_dict)
+        
+        self._explainer_id_counter += 1
+        return result  
+    
     def get_dygrace(self, fold_id, num_classes, in_channels, out_channels, batch_size,
                     lr, epochs_ae, enc_name, dec_name, autoencoder_name, top_k_cf,
                     config_dict=None):

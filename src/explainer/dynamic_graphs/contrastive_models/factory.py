@@ -3,6 +3,7 @@ from typing import List
 import torch.nn as nn
 
 from src.explainer.dynamic_graphs.contrastive_models.autoencoders import (
+    ContrastiveGAE,
     CustomGAE)
 from src.explainer.dynamic_graphs.contrastive_models.encoders import \
     GCNEncoder, GraphSAGE
@@ -23,7 +24,8 @@ class AEFactory:
         
         if model_name.lower() == 'gae':
             return CustomGAE(encoder=encoder, decoder=decoder)
-
+        if model_name.lower() == 'contrastive_gae':
+            return ContrastiveGAE(encoder=encoder, decoder=decoder)
         else:
             raise NameError(f"The model name {model_name} isn't supported.")
     
