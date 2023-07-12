@@ -120,26 +120,6 @@ class ContrastiveDyGRACE(Explainer):
             data_loader = self.transform_data(oracle, dataset, cls=cls)
             self.__train(data_loader, cls=cls)
                     
-    def __rebuild_truth(self, num_nodes, edge_indices, edge_weight):
-        truth = torch.zeros(size=(num_nodes, num_nodes)).double()
-        truth[edge_indices[0,:], edge_indices[1,:]] = edge_weight
-        truth[edge_indices[1,:], edge_indices[0,:]] = edge_weight
-        return truth
-    
-    def __rebuild_labels(self, labels: Tensor, node_indices: Tensor) -> Tensor:
-        # create a new labels tensor
-        new_labels = torch.zeros(size=(node_indices[-1], node_indices[-1]))
-        # set the new labels
-        from_index = 0
-        for i in range(1, len(node_indices)):
-            # find how many nodes are there for each graph in the batch
-            to_index = node_indices[i] - node_indices[i-1]
-            # set the labels
-            new_labels[from_index:to_index, :] = labels[i-1]
-            new_labels[:, from_index:to_index] = labels[i-1]
-            # swap the indices
-            from_index = to_index
-        return new_labels    
     
     def inference(self, search_instance: DataInstance, dataset: Dataset):
         indices = dataset.get_split_indices()[self.fold_id]['train']
@@ -154,26 +134,26 @@ class ContrastiveDyGRACE(Explainer):
         with torch.no_grad():
             contrastive_losses = {}
             for batch in data_loader:
-                graph1_x = batch.x_s.to(self.device)
-                graph1_edge_index = batch.edge_index_s.to(self.device)
-                graph1_edge_attr = batch.edge_attr_s.to(self.device)
+                g1_x = batch.x_s.to(self.device)
+                g1_edge_index = batch.edge_index_s.to(self.device)
+                g1_edge_attr = batch.edge_attr_s.to(self.device)
                                     
-                graph2_x = batch.x_t.to(self.device)
-                graph2_edge_index = batch.edge_index_t.to(self.device)
-                graph2_edge_attr = batch.edge_attr_t.to(self.device)
+                g2_x = batch.x_t.to(self.device)
+                g2_edge_index = batch.edge_index_t.to(self.device)
+                g2_edge_attr = batch.edge_attr_t.to(self.device)
                 
                 cf_id = batch.index_t
 
                 label = batch.label.to(self.device)
                 
-                z1 = self.autoencoders[factual_ae_index].encode(graph1_x, edge_index=graph1_edge_index, edge_weight=graph1_edge_attr)
-                z2 = self.autoencoders[factual_ae_index].encode(graph2_x, edge_index=graph2_edge_index, edge_weight=graph2_edge_attr)
+                z1 = self.autoencoders[factual_ae_index].encode(g1_x, edge_index=g1_edge_index, edge_weight=g1_edge_attr)
+                z2 = self.autoencoders[factual_ae_index].encode(g2_x, edge_index=g2_edge_index, edge_weight=g2_edge_attr)
                 
                 # we don't need the reconstruction error here
                 # since the contrastive loss gives us the necessary information
                 # on what are the possible valid counterfactuals
-                graph1_truth = self.__rebuild_truth(num_nodes=batch.x_s.shape[0], edge_indices=batch.edge_index_s, edge_weight=batch.edge_attr_s)
-                _, contrastive_loss = self.autoencoders[factual_ae_index].loss([z1,z2], [graph1_truth, label])
+                g1_truth = self.__rebuild_truth(num_nodes=batch.x_s.shape[0], edge_indices=batch.edge_index_s, edge_weight=batch.edge_attr_s)
+                _, contrastive_loss = self.autoencoders[factual_ae_index].loss([z1,z2], [g1_truth, label])
 
                 contrastive_losses[contrastive_loss.item()] = cf_id.item()
         # get the lowest k contrastive losses
@@ -188,11 +168,11 @@ class ContrastiveDyGRACE(Explainer):
         anchors, targets = [], []
         for i in indices:
             inst = dataset.get_instance(i)
+            # separate the anchors from the target
             if oracle.predict(inst) == cls:
                 anchors.append(inst)
             else:
                 targets.append(inst)
-            
         # create dataset of positive pairs    
         positive_dataset = GraphPairDataset(anchors, anchors, oracle)
         # create dataset of negative pairs
@@ -204,6 +184,21 @@ class ContrastiveDyGRACE(Explainer):
                                    drop_last=True, shuffle=True, follow_batch=['x_s', 'x_t'])
     
     def __get_anchor_autoencoder(self, anchor: Data) -> int:
+        """
+        Get the index of the anchor autoencoder with the
+        minimum reconstruction error for a given anchor data.
+
+        Args:
+            anchor (Data): The anchor data containing node features,
+                           edge indices, and edge weights.
+
+        Returns:
+            int: The index of the anchor autoencoder with the
+                 minimum reconstruction error.
+
+        Raises:
+            None
+        """
         with torch.no_grad():
             x = anchor.x.to(self.device)
             edge_index = anchor.edge_index.to(self.device)
@@ -228,38 +223,132 @@ class ContrastiveDyGRACE(Explainer):
         for epoch in range(self.epochs_ae):
             rec_losses = []
             contrastive_losses = []
+            losses = []
             for batch in data_loader:
-                graph1_x = batch.x_s.to(self.device)
-                graph1_edge_index = batch.edge_index_s.to(self.device)
-                graph1_edge_attr = batch.edge_attr_s.to(self.device)
-                                    
-                graph2_x = batch.x_t.to(self.device)
-                graph2_edge_index = batch.edge_index_t.to(self.device)
-                graph2_edge_attr = batch.edge_attr_t.to(self.device)
-                
+                # transform g1
+                g1_x = batch.x_s.to(self.device)
+                g1_edge_index = batch.edge_index_s.to(self.device)
+                g1_edge_attr = batch.edge_attr_s.to(self.device)
+                # transform g2      
+                g2_x = batch.x_t.to(self.device)
+                g2_edge_index = batch.edge_index_t.to(self.device)
+                g2_edge_attr = batch.edge_attr_t.to(self.device)
+                # get the indices of the virtual nodes in the batch
+                g1_v_node_indices = self.__get_virtual_node_indices(batch.x_s_batch)
+                g2_v_node_indices = self.__get_virtual_node_indices(batch.x_t_batch)
+
                 label = batch.label.to(self.device)
                 
                 self.optimizers[cls].zero_grad()
-                
-                z1 = self.autoencoders[cls].encode(graph1_x, edge_index=graph1_edge_index, edge_weight=graph1_edge_attr)
-                z2 = self.autoencoders[cls].encode(graph2_x, edge_index=graph2_edge_index, edge_weight=graph2_edge_attr)
-                
+                # encode the two graphs in the batch
+                z1 = self.autoencoders[cls].encode(g1_x, edge_index=g1_edge_index, edge_weight=g1_edge_attr)
+                z2 = self.autoencoders[cls].encode(g2_x, edge_index=g2_edge_index, edge_weight=g2_edge_attr)
+                # get the virtual nodes since they are the embedding
+                # of the whole graph (context)
+                # we only need these embeddings for the contrastive loss
+                z1_v_node = z1[g1_v_node_indices, :]
+                z2_v_node = z2[g2_v_node_indices, :]                
                 # rebuild the ground truth and the labels to calculate the contrastive loss
-                graph1_truth = self.__rebuild_truth(num_nodes=batch.x_s.shape[0], edge_indices=batch.edge_index_s, edge_weight=batch.edge_attr_s)
+                g1_truth = self.__rebuild_truth(num_nodes=batch.x_s.shape[0],
+                                                edge_indices=batch.edge_index_s,
+                                                edge_weight=batch.edge_attr_s,
+                                                v_node_indices=g1_v_node_indices)
+                
                 labels = self.__rebuild_labels(label, batch.x_s_ptr)
                 
-                rec_loss, contrastive_loss = self.autoencoders[cls].loss([z1, z2], [graph1_truth, labels])
+                print(g1_truth)
+                print(g1_truth.shape)
                 
-                (rec_loss + contrastive_loss).backward()
+                rec_loss, contrastive_loss = self.autoencoders[cls].loss(
+                    {
+                        "z1_v_node": z1_v_node,
+                        "z2_v_node": z2_v_node,
+                        "z1_for_rec": z1
+                    },
+                    {
+                        "g1_truth": g1_truth,
+                        "labels": labels
+                    }
+                )
+                # minimize both losses
+                loss = rec_loss + contrastive_loss
+                loss.backward()
                 self.optimizers[cls].step()
                 
+                losses.append(loss.item())
                 rec_losses.append(rec_loss.item())
                 contrastive_losses.append(contrastive_loss.item())
                 
-            print(f'Class {cls}, Epoch = {epoch} ----> Rec loss = {np.mean(rec_losses)}, Contrastive loss = {np.mean(contrastive_losses)}')
+            print(f'Class {cls}, Epoch = {epoch} ----> Rec loss = {np.mean(rec_losses)}, Contrastive loss = {np.mean(contrastive_losses)}, Overall loss = {np.mean(losses)}')
 
+    def __get_virtual_node_indices(self, batch_indices: Tensor) -> Tensor:
+        """
+        Get the indices of virtual nodes in a batch.
 
-    def save_autoencoder(self, model, cls):
+        Args:
+            batch_indices (torch.Tensor): Tensor containing the indices of nodes in a batch.
+
+        Returns:
+            torch.Tensor: Tensor containing the indices of virtual nodes in the batch.
+
+        Raises:
+            None
+        """
+        
+        # Get unique elements in the tensor
+        unique_elements = torch.unique(batch_indices)
+        # Initialize a dictionary to store the first occurrence index
+        first_occurrence_index = {}
+        # Iterate over unique elements and find their first occurrence index
+        for element in unique_elements:
+            index = (batch_indices == element).nonzero()[0].item()
+            first_occurrence_index[element.item()] = index
+            
+        return torch.LongTensor(list(first_occurrence_index.values()))
+    
+    
+    def __rebuild_truth(self, num_nodes: int, edge_indices: Tensor, edge_weight: Tensor, v_node_indices: Tensor) -> Tensor:
+        truth = torch.zeros(size=(num_nodes, num_nodes)).double()
+        truth[edge_indices[0,:], edge_indices[1,:]] = edge_weight
+        truth[edge_indices[1,:], edge_indices[0,:]] = edge_weight
+        
+        for x in v_node_indices:
+            # Remove x-th row and x-th column from tensor truth
+            truth = torch.cat((truth[:x], truth[x + 1:]), dim=0)
+            truth = torch.cat((truth[:, :x], truth[:, x + 1:]), dim=1)
+        
+        return truth
+    
+    def __rebuild_labels(self, labels: Tensor, node_indices: Tensor) -> Tensor:
+        # create a new labels tensor
+        new_labels = torch.zeros(size=(node_indices[-1], node_indices[-1]))
+        # set the new labels
+        from_index = 0
+        for i in range(1, len(node_indices)):
+            # find how many nodes are there for each graph in the batch
+            to_index = node_indices[i] - node_indices[i-1]
+            # set the labels
+            new_labels[from_index:to_index, :] = labels[i-1]
+            new_labels[:, from_index:to_index] = labels[i-1]
+            # swap the indices
+            from_index = to_index
+        return new_labels    
+    
+    
+    def save_autoencoder(self, model: torch.nn.Module, cls: int):
+        """
+        Save the state_dict of an autoencoder model.
+
+        Args:
+            model (torch.nn.Module): The autoencoder model to be saved.
+            cls (int): The class identifier for the autoencoder.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         try:
             os.mkdir(self.explainer_uri)                    
         except FileExistsError:
@@ -269,6 +358,18 @@ class ContrastiveDyGRACE(Explainer):
                  os.path.join(self.explainer_store_path, self.name, f'autoencoder_{cls}'))
         
     def load_autoencoders(self):
+        """
+        Load the state_dicts of autoencoder models.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         for i, _ in enumerate(self.autoencoders):
             self.autoencoders[i].load_state_dict(torch.load(os.path.join(self.explainer_store_path,
                                                                          self.name, f'autoencoder_{i}')))
