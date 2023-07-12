@@ -5,15 +5,13 @@ from src.explainer.dynamic_graphs.contrastive_models.losses import SupervisedCon
 import torch
 import torch.nn as nn
 from torch import Tensor
-from torch_geometric.nn import GAE, VGAE
-import torch.nn.functional as F
-from torch_geometric.utils import negative_sampling
+from torch_geometric.nn import GAE
 
 
 class AutoEncoder(ABC):
         
     @abstractmethod
-    def loss(self, z: Tensor, truth):
+    def loss(self, z, truth):
         pass
     
 class CustomGAE(GAE, AutoEncoder):
@@ -36,11 +34,9 @@ class ContrastiveGAE(GAE, AutoEncoder):
         self.constrastive_loss = SupervisedContrastiveLoss(margin=margin)
         self.mse = nn.MSELoss()
         
-    def loss(self, z: Tensor, truth):
-        z1, z2 = torch.unbind(z)
-        
-        rec_x1 = self.decoder.forward_all(z1, sigmoid=False)
-        rec_x2 = self.decoder.forward_all(z2, sigmoid=False)
+    def loss(self, z, truth):        
+        rec_x1 = self.decoder.forward_all(z[0], sigmoid=False)
+        rec_x2 = self.decoder.forward_all(z[1], sigmoid=False)
         
         return self.mse(rec_x1, truth[0]), self.constrastive_loss(rec_x1, rec_x2, truth[1])
         
