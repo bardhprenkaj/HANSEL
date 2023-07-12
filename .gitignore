@@ -131,7 +131,7 @@ dmypy.json
 .pyre/
 
 # data folders
-#data/
+data/
 output/
 stats/
 legacy/
