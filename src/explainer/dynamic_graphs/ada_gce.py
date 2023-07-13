@@ -11,7 +11,7 @@ from torch_geometric.loader import DataLoader
 
 from src.dataset.dataset_base import Dataset
 from src.dataset.torch_geometric.dataset_geometric import TorchGeometricDataset
-from src.explainer.dynamic_graphs.contrastive_models.factory import (
+from src.utils.autoencoder_factory import (
     AEFactory, SiameseFactory)
 from src.explainer.explainer_base import Explainer
 from src.oracle.oracle_base import Oracle

@@ -3,7 +3,8 @@ from abc import ABC, abstractclassmethod
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv, SAGEConv, GCN, GAT
+from torch_geometric.nn import GCNConv, SAGEConv
+from torch_geometric.nn.pool import global_mean_pool
 
 
 class Encoder(ABC):
@@ -11,8 +12,6 @@ class Encoder(ABC):
     @abstractclassmethod
     def encode(self, graph, edge_index, edge_attr, **kwargs):
         pass
-
-    
 
 class GraphSAGE(nn.Module):
     def __init__(self, input_dim, hidden_dim):
@@ -30,7 +29,7 @@ class GraphSAGE(nn.Module):
         return x
 
 
-class GCNEncoder(nn.Module):
+class GCNEncoder(nn.Module, Encoder):
     
     def __init__(self,
                  in_channels=1,
@@ -43,11 +42,14 @@ class GCNEncoder(nn.Module):
         
         self.init_weights()
     
-    def forward(self, x, edge_index, edge_weight):
+    def forward(self, x, edge_index, edge_weight, batch=None):
         x = F.relu(self.conv1(x, edge_index=edge_index, edge_weight=edge_weight))
         x = F.relu(self.conv2(x, edge_index=edge_index, edge_weight=edge_weight))
-        return x
+        return x, global_mean_pool(x, batch)
     
+    def encode(self, graph, edge_index, edge_attr, **kwargs):
+        return self.forward(graph, edge_index, edge_attr, kwargs.batch)
+         
     def init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv3d):

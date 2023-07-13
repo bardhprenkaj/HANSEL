@@ -10,10 +10,10 @@ class TorchGeometricDataset(Dataset):
     super(TorchGeometricDataset, self).__init__()
     self.instances = instances
     
-  def __len__(self):
+  def len(self):
     return len(self.instances)
   
-  def __getitem__(self, idx):
+  def get(self, idx):
     return self.instances[idx]
   
   
@@ -54,15 +54,13 @@ class GraphPairDataset(Dataset):
                                     x_t=graph2.x, edge_index_t=graph2.edge_index, edge_attr_t=graph2.edge_attr,
                                     label=label, 
                                     index_s=data1.id,
-                                    index_t=data2.id,
-                                    num_nodes=data1.graph.number_of_nodes() + data2.graph.number_of_nodes()))
-        
+                                    index_t=data2.id))        
     self.instances = data_list
     
-  def __len__(self):
+  def len(self):
     return len(self.instances)
   
-  def __getitem__(self, idx):
+  def get(self, idx):
     return self.instances[idx]
   
   def to_geometric(self, instance: DataInstance, label=0) -> Data:   
@@ -74,7 +72,6 @@ class GraphPairDataset(Dataset):
     
     return Data(x=x, y=label, edge_index=a.T, edge_attr=w)
   
-  
 class PairData(Data):
   
   def __inc__(self, key, value, *args, **kwargs):
@@ -83,3 +80,7 @@ class PairData(Data):
     if key == 'edge_index_t':
       return self.x_t.size(0)
     return super().__inc__(key, value, *args, **kwargs)
+  
+  @property
+  def num_nodes(self):
+    return self.x_s.shape[0] + self.x_t.shape[0]

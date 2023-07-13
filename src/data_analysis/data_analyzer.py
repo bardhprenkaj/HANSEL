@@ -139,6 +139,7 @@ class DataAnalyzer():
         # create a list of file and sub directories 
         # names in the given directory 
         oracle_dataset_folders = os.listdir(self.stats_folder)
+        print(oracle_dataset_folders)
         result = []
         # Iterate over all the oracle_dataset folders
         for odf_entry in oracle_dataset_folders:

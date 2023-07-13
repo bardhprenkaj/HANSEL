@@ -27,7 +27,6 @@ class Evaluator(ABC):
         self._run_number = run_number
         self._explanations = []
         self._K = K
-        print(f'My K is = {self._K}')
         # Building the config file to write into disk
         evaluator_config = {'dataset': data._config_dict, 'oracle': oracle._config_dict, 'explainer': explainer._config_dict, 'metrics': []}
         for metric in evaluation_metrics:
@@ -130,12 +129,14 @@ class Evaluator(ABC):
                 self._explanations += counterfactuals
 
                 # The runtime metric is built-in inside the evaluator``
-                self._results['runtime'].append(end_time - start_time)
+                self._results.setdefault('runtime', []).append(end_time - start_time)
 
                 self._real_evaluate(inst, counterfactuals)
         else:
+            self._results = {}
             test_indices = self.dataset.splits[fold_id]['test']
             test_set = [i for i in self.dataset.instances if i.id in test_indices]
+            print(f'The length of the test set is = {len(test_set)}')
 
             for inst in test_set:
                 
@@ -149,7 +150,7 @@ class Evaluator(ABC):
                 self._explanations.append(counterfactuals)
 
                 # The runtime metric is built-in inside the evaluator``
-                self._results['runtime'].append(end_time - start_time)
+                self._results.setdefault('runtime', []).append(end_time - start_time)
 
                 self._real_evaluate(inst, counterfactuals)
                 print('evaluated instance with id ', str(inst.id))
@@ -165,9 +166,8 @@ class Evaluator(ABC):
             
         for metric in self._evaluation_metrics:
             for k in range(1, self._K + 1):
-                self._results[f'{metric.name}@{k}'] = self._results.get(f'{metric.name}@{k}', [])
-                self._results[f'{metric.name}@{k}'].append(metric.evaluate(instance, counterfactuals[:k], oracle))
-
+                self._results.setdefault(f'{metric.name}@{k}', []).append(metric.evaluate(instance, counterfactuals[:k], oracle))
+                print(len(self._results[f'{metric.name}@{k}']))
 
     def write_results(self):
 

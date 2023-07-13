@@ -4,32 +4,25 @@
         {"name": "embedder_store_path", "address": "./data/embedders/"},
         {"name": "oracle_store_path", "address": "./data/oracles/"},
         {"name": "explainer_store_path", "address": "./data/explainers/"},
-        {"name": "output_store_path", "address": "./output/tree-cycles-dynamic"}
+        {"name": "output_store_path", "address": "./output/DBLP"}
     ],
     "datasets": [
         {
-            "name": "dynamic_tree_cycles", 
+            "name": "coauthorship_dblp", 
             "parameters": {
                 "begin_time": 2000,
-                "end_time": 2003,
-                "num_instances_per_snapshot": 100,
-                "n_nodes": 28,
-                "nodes_in_cycle": 7
+                "end_time": 2010,
+                "sampling_ratio": 0.01,
+                "percentile": 75,
+                "min_nodes_per_egonet": 10,
+                "features_dim": 10
             } 
         }
     ],
     "oracles": [
         {
-            "name": "dynamic_oracle",
-            "parameters": {
-                "base_oracle" : {
-                    "name": "tree_cycles_custom_oracle", 
-                    "parameters": {}
-                },
-                "first_train_timestamp": 2000
-                
-            }
-            
+            "name" : "id_oracle",
+            "parameters": {}
         }
     ],
     "explainers": [
@@ -38,9 +31,9 @@
             "parameters": { 
                 "in_channels": 4,
                 "out_channels": 4,
-                "epochs_ae": 10,
+                "epochs_ae": 150,
                 "fold_id": 0,
-                "lr": 1e-2,
+                "lr": 1e-4,
                 "autoencoder_name":"contrastive_gae",
                 "encoder_name": "gcn_encoder",
                 "weight_schedulers": [
@@ -57,7 +50,7 @@
                         }
                     }
                 ]
-            } 
+            }
         }
     ],
     "evaluation_metrics": [ 

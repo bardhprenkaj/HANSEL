@@ -1,9 +1,14 @@
+from typing import List
+
+import torch
+
 from src.dataset.converters.cf2_converter import CF2TreeCycleConverter
 from src.dataset.converters.weights_converter import \
     DefaultFeatureAndWeightConverter
 from src.evaluation.evaluation_metric_factory import EvaluationMetricFactory
 from src.explainer.dynamic_graphs.ada_gce import AdaptiveGCE
-from src.explainer.dynamic_graphs.contrastive_dygrace import ContrastiveDyGRACE
+from src.explainer.dynamic_graphs.contrastive_models.contrastive_dygrace import \
+    ContrastiveDyGRACE
 from src.explainer.dynamic_graphs.model import DyGRACE
 from src.explainer.ensemble.ensemble_factory import EnsembleFactory
 from src.explainer.explainer_base import Explainer
@@ -25,6 +30,9 @@ from src.explainer.meg.environments.bbbp_env import BBBPEnvironment
 from src.explainer.meg.explainer_meg import MEGExplainer
 from src.explainer.meg.utils.encoders import (
     IDActionEncoder, MorganBitFingerprintActionEncoder)
+from src.utils.autoencoder_factory import AEFactory
+from src.utils.weight_schedulers import WeightScheduler
+from src.utils.weight_scheduler_factory import WeightSchedulerFactory
 
 
 class ExplainerFactory:
@@ -33,6 +41,8 @@ class ExplainerFactory:
         self._explainer_id_counter = 0
         self._explainer_store_path = explainer_store_path
         self._ensemble_factory = EnsembleFactory(explainer_store_path, self)
+        self._autoencoder_factory = AEFactory()
+        self._weight_scheduler_factory = WeightSchedulerFactory()
 
     def get_explainer_by_name(self, explainer_dict, metric_factory : EvaluationMetricFactory) -> Explainer:
         explainer_name = explainer_dict['name']
@@ -309,11 +319,19 @@ class ExplainerFactory:
             enc_name = explainer_parameters.get('encoder_name', 'var_gcn_encoder')
             dec_name = explainer_parameters.get('decoder_name', None)
             autoencoder_name = explainer_parameters.get('autoencoder_name', 'vgae')
-               
+            
             return self.get_dygrace(fold_id, num_classes, in_channels, out_channels, batch_size,
                                     lr, epochs_ae, enc_name, dec_name, autoencoder_name, top_k_cf,
                                     config_dict=explainer_dict)
+            
         elif explainer_name == 'contrastive_dygrace':
+            if 'weight_schedulers' not in explainer_parameters:
+                raise ValueError('''ContrastiveDyGRACE needs to have the weight schedulers specified''')
+            
+            schedulers = explainer_parameters['weight_schedulers']
+            # we only need two weight schedulers
+            assert(len(schedulers) == 2)
+            
             fold_id = explainer_parameters.get('fold_id', 0)
             num_classes = explainer_parameters.get('num_classes', 2)
             in_channels = explainer_parameters.get('in_channels', 1)
@@ -326,31 +344,49 @@ class ExplainerFactory:
             enc_name = explainer_parameters.get('encoder_name', 'var_gcn_encoder')
             dec_name = explainer_parameters.get('decoder_name', None)
             autoencoder_name = explainer_parameters.get('autoencoder_name', 'vgae')
+            
+            autoencoders = self._autoencoder_factory.init_autoencoders(autoencoder_name=autoencoder_name,
+                                                                       enc_name=enc_name,
+                                                                       dec_name=dec_name,
+                                                                       in_channels=in_channels,
+                                                                       out_channels=out_channels,
+                                                                       num_classes=num_classes)
+            
+            schedulers = tuple([self._weight_scheduler_factory.get_scheduler_by_name(weight_dict) for weight_dict in schedulers])
+            alpha_scheduler, beta_scheduler = schedulers
                
-            return self.get_contrastive_dygrace(fold_id, num_classes, in_channels, out_channels, batch_size,
-                                    lr, epochs_ae, enc_name, dec_name, autoencoder_name, top_k_cf,
-                                    config_dict=explainer_dict)
+            return self.get_contrastive_dygrace(autoencoders=autoencoders,
+                                                alpha_scheduler=alpha_scheduler,
+                                                beta_scheduler=beta_scheduler,
+                                                batch_size=batch_size,
+                                                epochs=epochs_ae,
+                                                lr=lr,
+                                                k=top_k_cf,
+                                                fold_id=fold_id,
+                                                config_dict=explainer_dict)
         else:
             raise ValueError('''The provided explainer name does not match any explainer provided 
             by the factory''')
             
-    def get_contrastive_dygrace(self, fold_id, num_classes, in_channels, out_channels, batch_size,
-                    lr, epochs_ae, enc_name, dec_name, autoencoder_name, top_k_cf,
-                    config_dict=None):
+    def get_contrastive_dygrace(self,
+                                autoencoders: List[torch.nn.Module],
+                                alpha_scheduler: WeightScheduler,
+                                beta_scheduler: WeightScheduler,
+                                batch_size: int = 8,
+                                epochs: int = 100,
+                                lr: float = 1e-3,
+                                k: int = 10,
+                                fold_id: int = 0,
+                                config_dict = None) -> Explainer:
         
         result = ContrastiveDyGRACE(id=self._explainer_id_counter,
                      explainer_store_path=self._explainer_store_path,
-                     fold_id=fold_id,
-                     num_classes=num_classes,
-                     in_channels=in_channels,
-                     out_channels=out_channels,
+                     autoencoders=autoencoders,
+                     alpha_scheduler=alpha_scheduler,
+                     beta_scheduler=beta_scheduler,
                      batch_size=batch_size,
-                     lr=lr,
-                     epochs_ae=epochs_ae,
-                     enc_name=enc_name,
-                     dec_name=dec_name,
-                     autoencoder_name=autoencoder_name,
-                     top_k_cf=top_k_cf,
+                     epochs=epochs,
+                     lr=lr, k=k, fold_id=fold_id,
                      config_dict=config_dict)
         
         self._explainer_id_counter += 1

@@ -1,5 +1,5 @@
 from typing import List
-from src.explainer.dynamic_graphs.contrastive_models.encoders import Encoder
+from src.utils.encoders import Encoder
 
 import torch
 import torch.nn as nn

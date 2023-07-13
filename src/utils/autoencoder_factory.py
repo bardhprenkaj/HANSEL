@@ -1,17 +1,19 @@
 from typing import List
 
 import torch.nn as nn
+import torch
 
-from src.explainer.dynamic_graphs.contrastive_models.autoencoders import (
-    ContrastiveGAE,
-    CustomGAE)
-from src.explainer.dynamic_graphs.contrastive_models.encoders import \
-    GCNEncoder, GraphSAGE
+from src.utils.autoencoders import ContrastiveGAE, CustomGAE
+from src.utils.encoders import GCNEncoder, GraphSAGE
 from src.explainer.dynamic_graphs.contrastive_models.siamese_modules import \
     DenseSiamese
 
 
 class AEFactory:
+    
+    def __init__(self):
+        self.name = self.__class__.__name__
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
            
     def get_model(self,
                   model_name: str,
@@ -48,6 +50,26 @@ class AEFactory:
                     **kwargs) -> nn.Module:
         return None # to be changed in the future. For now InnerProduct is fine.                
     
+    
+    def init_autoencoders(self,
+                          autoencoder_name: str,
+                          enc_name: str,
+                          dec_name: str,
+                          in_channels: int = 8,
+                          out_channels: int = 64,
+                          num_classes: int=2) -> List[nn.Module]:
+        
+        return [
+            self.get_model(model_name=autoencoder_name,
+                           encoder=self.get_encoder(name=enc_name,
+                                                    in_channels=in_channels,
+                                                    out_channels=out_channels),
+                           decoder=self.get_decoder(name=dec_name,
+                                                    in_channels=in_channels,
+                                                    out_channels=out_channels))\
+                                                        .double().to(self.device)\
+                                                            for _ in range(num_classes)
+        ]
     
 class SiameseFactory:
     

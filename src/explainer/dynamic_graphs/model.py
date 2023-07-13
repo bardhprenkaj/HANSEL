@@ -3,7 +3,7 @@ from copy import deepcopy
 from itertools import combinations, permutations, product
 from operator import itemgetter
 from typing import Dict, List, Tuple
-import matplotlib.pyplot as plt
+
 import joblib
 import numpy as np
 import pandas as pd
@@ -16,9 +16,9 @@ from src.dataset.data_instance_base import DataInstance
 from src.dataset.dataset_base import Dataset
 from src.dataset.torch_geometric.dataset_geometric import TorchGeometricDataset
 from src.evaluation.evaluation_metric_ged import GraphEditDistanceMetric
-from src.explainer.dynamic_graphs.contrastive_models.factory import AEFactory
 from src.explainer.explainer_base import Explainer
 from src.oracle.oracle_base import Oracle
+from src.utils.autoencoder_factory import AEFactory
 
 
 class DyGRACE(Explainer):
@@ -450,7 +450,7 @@ class DyGRACE(Explainer):
 
                 optimiser.zero_grad()
 
-                z = self.autoencoders[cls].encode(x, edge_index=edge_index, edge_weight=edge_weight)
+                z, _ = self.autoencoders[cls].encode(x, edge_index=edge_index, edge_weight=edge_weight)
                 loss = self.autoencoders[cls].loss(z, truth)
                 if maximise:
                     loss = (1 / loss * self.EPS)               
