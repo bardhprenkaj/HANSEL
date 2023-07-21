@@ -75,7 +75,7 @@ class DynamicEvaluatorManager(EvaluatorManager):
                     # Creating the evaluator
                     evaluator = DynamicEvaluator(evaluator_id, dataset,
                                                  oracle, explainer, self.evaluation_metrics,
-                                                 self._output_store_path, self._run_number, self.K)
+                                                 self._output_store_path, self._run_number, False, self.K)
 
                     # Adding the evaluator to the evaluator's list
                     self.evaluators.append(evaluator)

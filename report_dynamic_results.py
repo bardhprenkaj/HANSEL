@@ -12,20 +12,6 @@ from src.evaluation.evaluation_metric_ged import GraphEditDistanceMetric
 from src.evaluation.evaluation_metric_oracle_accuracy import \
     OracleAccuracyMetric
 from src.evaluation.evaluation_metric_sparsity import SparsityMetric
-
-def update_dictionary(dict1, dict2):
-    for key, value in dict2.items():
-        for key1, value1 in value.items():
-            flattened_val = []
-            for vals in value1:
-                if type(vals) == list:
-                    flattened_val += vals
-                else:
-                    flattened_val.append(vals)
-            if key1 in dict1:
-                dict1[key][key1] += flattened_val
-            else:
-                dict1[key][key1] = flattened_val
             
 if __name__ == '__main__':
     
@@ -39,7 +25,9 @@ if __name__ == '__main__':
         df = pd.DataFrame(files, columns=['out_path'])
         df['year'] = df.out_path.apply(lambda path : re.findall('(\d{4})', path)[0])
         
-        report = {year: {} for year in df.year.unique()}
+        report = {year: {f'{metric._name}@{i}': [] for i in range(1,k+1) for metric in metrics}  for year in df.year.unique()}
+        for year in report.keys():
+            report[year].setdefault("runtime", [])
 
         for group in df.groupby(by='year'):
             onlyfiles = np.array([glob.glob(f'{filepath}/*') for filepath in group[1].out_path.values]).flatten()
@@ -49,11 +37,25 @@ if __name__ == '__main__':
                     for i in range(1, k+1):
                         for metric in metrics:
                             curr_metric = reports.get(f'{metric._name}@{i}', [])
-                            update_dictionary(report, {group[0] : {f'{metric._name}@{i}': curr_metric}})
+                            for elem in curr_metric:
+                                if type(elem) == list:
+                                    report[group[0]][f'{metric._name}@{i}'] += elem
+                                else:
+                                    report[group[0]][f'{metric._name}@{i}'].append(elem)
+                    runtime = reports.get('runtime', [])
+                    for elem in runtime:
+                        if type(elem) == list:
+                            report[group[0]]['runtime'] += elem
+                        else:
+                            report[group[0]]['runtime'].append(float(elem))
         
         for year in report.keys():
             for metric in report[year]:
-                report[year][metric] = f'{np.mean(report[year][metric])} \pm {np.std(report[year][metric])}'
-        
+                report[year][metric] = f'{np.mean(report[year][metric]):.2f}^'+"{"+f'\\pm {np.std(report[year][metric]):.3f}'+"}"
+                
+            if type(report[year]['runtime']) != str:
+                report[year]['runtime'] = np.array(report[year]['runtime']).astype(np.float64)
+                report[year]['runtime'] = f'{np.mean(report[year]["runtime"]):.2f}^'+"{"+f'\\pm {np.std(report[year]["runtime"]):.3f}'+"}"
+            
         with open('yearly_metric_reports.json', 'w') as f:
             json.dump(report, f)

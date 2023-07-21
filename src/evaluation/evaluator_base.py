@@ -167,7 +167,6 @@ class Evaluator(ABC):
         for metric in self._evaluation_metrics:
             for k in range(1, self._K + 1):
                 self._results.setdefault(f'{metric.name}@{k}', []).append(metric.evaluate(instance, counterfactuals[:k], oracle))
-                print(len(self._results[f'{metric.name}@{k}']))
 
     def write_results(self):
 

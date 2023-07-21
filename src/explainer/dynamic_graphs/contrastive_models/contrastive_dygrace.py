@@ -5,6 +5,7 @@ from typing import List
 
 import numpy as np
 import torch
+import wandb
 from torch import Tensor
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
@@ -50,7 +51,11 @@ class ContrastiveDyGRACE(Explainer):
 
         
     def explain(self, instance, oracle: Oracle, dataset: Dataset):
-        explainer_name = f'{self.__class__.__name__}_fit_on_{dataset.name}_fold_id_{self.fold_id}'
+        explainer_name = f'{self.__class__.__name__}_fit_on_{dataset.name}_fold_id_{self.fold_id}'\
+            + f'_batch_size_{self.batch_size}_lr_{self.lr}_epochs_{self.epochs}_k_{self.k}'\
+                + f'_autoencoders_{[str(autoencoder.encoder) + " " +  str(autoencoder.decoder) for autoencoder in self.autoencoders]}'\
+                    + f'_alpha_scheduler_{self.alpha_scheduler.__class__.__name__}'\
+                        + f'_beta_scheduler_{self.beta_scheduler.__class__.__name__}'
         self.explainer_uri = os.path.join(self.explainer_store_path, explainer_name)
         self.name = explainer_name
         # train using the oracle only in the first iteration
@@ -279,7 +284,12 @@ class ContrastiveDyGRACE(Explainer):
                 contrastive_losses.append(contrastive_loss.item())
                 
             #print(f'Class {cls}, Epoch = {epoch} ----> Rec loss = {np.mean(rec_losses[epoch]): .4f}, Contrastive loss = {np.mean(contrastive_losses): .4f},\t alpha = {alpha: .4f}, beta = {beta: .4f}')
-    
+            wandb.log({
+                'rec_loss': np.mean(rec_losses[epoch]),
+                'contrastive_loss': np.mean(contrastive_losses),
+                'epoch': epoch,
+                'iteration': self.iteration
+            })
     
     def __rebuild_truth(self, num_nodes: int, edge_indices: Tensor, edge_weight: Tensor) -> Tensor:
         truth = torch.zeros(size=(num_nodes, num_nodes)).double()

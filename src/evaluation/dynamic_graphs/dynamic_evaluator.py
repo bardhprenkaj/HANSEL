@@ -15,6 +15,7 @@ class DynamicEvaluator(Evaluator):
                  evaluation_metrics,
                  results_store_path,
                  run_number=0,
+                 break_on_first=False,
                  K=5) -> None:
         
         assert isinstance(data, DynamicDataset)
@@ -24,6 +25,7 @@ class DynamicEvaluator(Evaluator):
                          results_store_path, K, run_number)
         
         self.dyn_graph = data.dynamic_graph
+        self.break_on_first = break_on_first
         
         
     def evaluate(self):
@@ -34,5 +36,6 @@ class DynamicEvaluator(Evaluator):
             self._explainer.iteration = time - begin_time
             self._data = self.dyn_graph[time]
             super().evaluate()
- 
-                
+            if self.break_on_first:
+                print("Hey")
+                break
