@@ -52,10 +52,9 @@ class ContrastiveDyGRACE(Explainer):
         
     def explain(self, instance, oracle: Oracle, dataset: Dataset):
         explainer_name = f'{self.__class__.__name__}_fit_on_{dataset.name}_fold_id_{self.fold_id}'\
-            + f'_batch_size_{self.batch_size}_lr_{self.lr}_epochs_{self.epochs}_k_{self.k}'\
-                + f'_autoencoders_{[str(autoencoder.encoder) + " " +  str(autoencoder.decoder) for autoencoder in self.autoencoders]}'\
-                    + f'_alpha_scheduler_{self.alpha_scheduler.__class__.__name__}'\
-                        + f'_beta_scheduler_{self.beta_scheduler.__class__.__name__}'
+            + f'_batch={self.batch_size}_lr={self.lr}_e={self.epochs}_k={self.k}'\
+                    + f'_alpha={self.alpha_scheduler.__class__.__name__}'\
+                        + f'_beta={self.beta_scheduler.__class__.__name__}'
         self.explainer_uri = os.path.join(self.explainer_store_path, explainer_name)
         self.name = explainer_name
         # train using the oracle only in the first iteration
@@ -231,10 +230,15 @@ class ContrastiveDyGRACE(Explainer):
         for epoch in range(self.epochs):
             contrastive_losses = []
             # update the alpha and beta weights for the two objectives
-            alpha = self.alpha_scheduler.update({'curr_epoch': epoch, 'overall_epochs': self.epochs})
+            alpha = self.alpha_scheduler.update({'prev_loss': np.mean(rec_losses[epoch-2]) if (epoch - 2) >= 0 else None,
+                                               'curr_loss': np.mean(rec_losses[epoch-1]) if (epoch - 1) >= 0 else None,
+                                               'curr_epoch': epoch,
+                                               'overall_epochs': self.epochs})
+            
             beta = self.beta_scheduler.update({'prev_loss': np.mean(rec_losses[epoch-2]) if (epoch - 2) >= 0 else None,
                                                'curr_loss': np.mean(rec_losses[epoch-1]) if (epoch - 1) >= 0 else None,
-                                               'curr_epoch': epoch})
+                                               'curr_epoch': epoch,
+                                               'overall_epochs': self.epochs})
             
             # loop through the batches
             for batch in data_loader:
@@ -283,12 +287,11 @@ class ContrastiveDyGRACE(Explainer):
                 rec_losses[epoch].append(rec_loss.item())
                 contrastive_losses.append(contrastive_loss.item())
                 
-            #print(f'Class {cls}, Epoch = {epoch} ----> Rec loss = {np.mean(rec_losses[epoch]): .4f}, Contrastive loss = {np.mean(contrastive_losses): .4f},\t alpha = {alpha: .4f}, beta = {beta: .4f}')
+            print(f'Class {cls}, Epoch = {epoch} ----> Rec loss = {np.mean(rec_losses[epoch]): .4f}, Contrastive loss = {np.mean(contrastive_losses): .4f},\t alpha = {alpha: .4f}, beta = {beta: .4f}')
             wandb.log({
-                'rec_loss': np.mean(rec_losses[epoch]),
-                'contrastive_loss': np.mean(contrastive_losses),
-                'epoch': epoch,
-                'iteration': self.iteration
+                f'rec_loss_{cls}': np.mean(rec_losses[epoch]),
+                f'contrastive_loss_{cls}': np.mean(contrastive_losses),
+                f'epoch_{cls}': epoch,
             })
     
     def __rebuild_truth(self, num_nodes: int, edge_indices: Tensor, edge_weight: Tensor) -> Tensor:

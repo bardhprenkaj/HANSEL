@@ -112,7 +112,7 @@ class Evaluator(ABC):
 
     def evaluate(self):
         for m in self._evaluation_metrics:
-            self._results[m.name] = []
+            self._results[m._name] = []
 
         # If the explainer was trained then evaluate only on the test set, else evaluate on the entire dataset
         fold_id = self._explainer.fold_id
@@ -166,7 +166,7 @@ class Evaluator(ABC):
             
         for metric in self._evaluation_metrics:
             for k in range(1, self._K + 1):
-                self._results.setdefault(f'{metric.name}@{k}', []).append(metric.evaluate(instance, counterfactuals[:k], oracle))
+                self._results.setdefault(f'{metric._name}@{k}', []).append(metric.evaluate(instance, counterfactuals[:k], oracle))
 
     def write_results(self):
 
