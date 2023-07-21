@@ -96,20 +96,23 @@ class DyGRACE(Explainer):
             df = pd.concat([df, pd.DataFrame(rows)])
                 
         df.rec_cf *= -1
-                
-        y_pred = self.contrastive_learner.predict(df.values[:,:-1])
-        
-        factuals = np.where(y_pred == 0)[0]
-        factuals = self.__sample_k(dataset, df) if len(factuals) else [instance]
-        
-        counterfactuals = np.where(y_pred == 1)[0]
-        counterfactuals = self.__sample_k(dataset, df, dim=1) if len(counterfactuals) else [instance]
+        try:
+            y_pred = self.contrastive_learner.predict(df.values[:,:-1])
+            
+            factuals = np.where(y_pred == 0)[0]
+            factuals = self.__sample_k(dataset, df) if len(factuals) else [instance]
+            
+            counterfactuals = np.where(y_pred == 1)[0]
+            counterfactuals = self.__sample_k(dataset, df, dim=1) if len(counterfactuals) else [instance]
 
-        if self.iteration > 0:
-            self.update(deepcopy(instance),
-                        deepcopy(counterfactuals),
-                        deepcopy(factuals),
-                        oracle)            
+            if self.iteration > 0:
+                self.update(deepcopy(instance),
+                            deepcopy(counterfactuals),
+                            deepcopy(factuals),
+                            oracle)
+        except ValueError:
+            # the logistic regressor / AEs don't find any counterfactual
+            counterfactuals = [instance]            
 
         return counterfactuals
         
@@ -186,7 +189,7 @@ class DyGRACE(Explainer):
         x, edge_index, edge_weights, _, truth = self.__expand(self.__to_geometric(instance, label=torch.Tensor([-1])))
         # get the reconstruction errors of each autoencoder for the input instace
         with torch.no_grad():
-            rec_errors = [autoencoder.loss(autoencoder.encode(x, edge_index, edge_weights), truth) for autoencoder in self.autoencoders]
+            rec_errors = [autoencoder.loss(autoencoder.encode(x, edge_index, edge_weights)[0], truth) for autoencoder in self.autoencoders]
         # the lowest reconstruction erorr will represent the factual autoencoder    
         factual_label = np.argmin(rec_errors)
         # transform the list of counterafactuals in a torch geometric data loader
@@ -257,27 +260,32 @@ class DyGRACE(Explainer):
         
         x, edge_index, edge_weights, _, truth = self.__expand(self.__to_geometric(search_for_instance, label=torch.Tensor([-1])))
         with torch.no_grad():
-            rec_errors = [autoencoder.loss(autoencoder.encode(x, edge_index, edge_weights), truth) for autoencoder in self.autoencoders]
-            # the lowest reconstruction erorr will represent the factual autoencoder    
-            factual_label = np.argmin(rec_errors)        
-                    
-            for data in data_loader:
-                x, edge_index, edge_attr, label, truth = self.__expand(data)
-                # if the current graph isn't a single isolated node
-                if edge_index.shape[-1] != 0:
-                    instance = dataset.get_instance(label.item())                
-                    
-                    for i, autoencoder in enumerate(self.autoencoders):
-                        if i != factual_label:
-                            z = autoencoder.encode(x, edge_index, edge_attr)
-                            rec_error = autoencoder.loss(z, truth).item()
-                            rows['rec_cf'].append(rec_error)
-                            rows['rec_f'].append(rec_errors[factual_label].item())
+            try:
+                rec_errors = [autoencoder.loss(autoencoder.encode(x, edge_index, edge_weights)[0], truth) for autoencoder in self.autoencoders]
+                # the lowest reconstruction erorr will represent the factual autoencoder    
+                factual_label = np.argmin(rec_errors)        
+                        
+                for data in data_loader:
+                        x, edge_index, edge_attr, label, truth = self.__expand(data)
+                        # if the current graph isn't a single isolated node
+                        if edge_index.shape[-1] != 0:
+                            instance = dataset.get_instance(label.item())                
                             
-                            rows['instance'] += [label.item()]
-                    
-                    similarity = 1 / (1 + GraphEditDistanceMetric().evaluate(search_for_instance, [instance])[0])
-                    rows['sim'] += [similarity]
+                            for i, autoencoder in enumerate(self.autoencoders):
+                                if i != factual_label:
+                                    z, _ = autoencoder.encode(x, edge_index, edge_attr)
+                                    rec_error = autoencoder.loss(z, truth).item()
+                                    rows['rec_cf'].append(rec_error)
+                                    rows['rec_f'].append(rec_errors[factual_label].item())
+                                    
+                                    rows['instance'] += [label.item()]
+                            
+                            similarity = 1 / (1 + GraphEditDistanceMetric().evaluate(search_for_instance, [instance])[0])
+                            rows['sim'] += [similarity]
+            except IndexError:
+                # there is only 1 edge between the two nodes
+                # it doesn't make sense to perform any encoding in this case
+                pass
             
         return rows
         
@@ -305,7 +313,7 @@ class DyGRACE(Explainer):
                     # measure reconstruction error                                        
                     for j, autoencoder in enumerate(self.autoencoders):
                         # encode the current graph and take its reconstruction error
-                        z = autoencoder.encode(x, edge_index=edge_index, edge_weight=edge_attr)
+                        z, _ = autoencoder.encode(x, edge_index=edge_index, edge_weight=edge_attr)
                         rec_error = autoencoder.loss(z, truth).item()
                         # counterfactual error as small as possible
                         if anchor_label != j: 
