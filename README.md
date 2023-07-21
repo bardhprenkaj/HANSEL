@@ -13,9 +13,10 @@
 * [References](#references)
 
 ## Team Information:
-* Bardh Prenkaj [Principal Investigator]
-* Mario Villaizán-Vallelado [Investigator]
-* Mario Alfonso Prado Romero [Investigator]
+* Bardh Prenkaj (Sapienza University of Rome) [Principal Investigator]
+* Mario Villaizán-Vallelado (University of Valladolid) [Investigator]
+* Tobias Leemann (University of Tuebingen) [Investigator]
+* Gjergji Kasneci (TU Munich) [Supervisor]
 
 ## General Information:
 
