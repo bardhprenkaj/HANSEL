@@ -14,27 +14,27 @@ print('Executing:'+sys.argv[1])
 
 # Define sweep config
 sweep_configuration = {
-    'method': 'grid',
+    'method': 'bayes',
     'name': f'Run={run_name}',
     'metric': {'goal': 'maximize', 'name': 'Correctness'},
     'parameters': 
     {
         'batch_size': {'values': [2,4,8,16,32,64]},
-        'lr': {'values': list(np.arange(0.0001, 0.01, 0.001))},
+        'lr': {'values': {'max': 0.01, 'min': 0.001}},
         'epochs': {'values': list(range(5, 51, 5))},
         'k': {'values': list(range(1,21))},
         'out_channels': {'values': list(range(1,11))},
         'weight_decayer_alpha': {'values': ['no_decay', 'linear_decay', 'tolerance_scheduler']},
         'weight_decayer_beta': {'values': ['no_decay', 'linear_decay', 'tolerance_scheduler']},
-        'init_weight_alpha': {'values': list(np.arange(0.1,1.1,0.1))},
-        'increment_step_alpha': {'values': [0.01, 0.05, 0.1]},
-        'increment_step_beta': {'values': [0.01, 0.05, 0.1]},
+        'init_weight_alpha': {'values': {'max': 1, 'min': 0.1}},
+        'increment_step_alpha': {'values': {'max': 0.1, 'min': 0.01}},
+        'increment_step_beta': {'values': {'max': 0.1, 'min': 0.01}},
         'upper_bound_alpha': {'values': list(range(1,11))},
         'upper_bound_beta': {'values': list(range(1,11))},
         'lower_bound_alpha': {'values': list(range(10,-1,-1))},
         'lower_bound_beta': {'values': list(range(10,-1,-1))},
-        'tolerance_alpha': {'values': list(np.arange(0.001,0.1,0.01))},
-        'tolerance_beta': {'values': list(np.arange(0.001,0.1,0.01))}
+        'tolerance_alpha': {'values': {'max': 0.1, 'min': 0.001}},
+        'tolerance_beta': {'values': {'max': 0.1, 'min': 0.001}}
     }
 }
 
@@ -44,12 +44,12 @@ eval_manager = DynamicEvaluatorManager(config_file_path, run_number=0)
 # Initialize sweep by passing in config. 
 sweep_id = wandb.sweep(
   sweep=sweep_configuration, 
-  project='HANSEL'
+  project='GRETEL'
 )
 
 # sweep through the folds
 def main():
-    metric_reports = {f'{metric.name}': [] for metric in eval_manager.evaluation_metrics}
+    metric_reports = {f'{metric._name}': [] for metric in eval_manager.evaluation_metrics}
 
     for fold_id in range(1):
         run = wandb.init()
