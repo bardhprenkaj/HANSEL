@@ -9,7 +9,7 @@ from src.evaluation.evaluation_metric_factory import EvaluationMetricFactory
 from src.explainer.dynamic_graphs.ada_gce import AdaptiveGCE
 from src.explainer.dynamic_graphs.contrastive_models.contrastive_dygrace import \
     ContrastiveDyGRACE
-from src.explainer.dynamic_graphs.model import DyGRACE
+from explainer.dynamic_graphs.explainer_dygrace import DyGRACE
 from src.explainer.ensemble.ensemble_factory import EnsembleFactory
 from src.explainer.explainer_base import Explainer
 from src.explainer.explainer_bidirectional_search import (
