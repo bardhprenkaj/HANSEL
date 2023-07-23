@@ -1,5 +1,5 @@
 
-# GRETEL: Graph Counterfactual Explanation Evaluation Framework
+# HANSEL: Graph Counterfactual Explanation under Dynamic Data Changes
 
 ## Table of Contents
 
@@ -20,27 +20,21 @@
 
 ## General Information:
 
-GRETEL [1] is an open source framework for Evaluating Graph Counterfactual Explanation Methods. It is implemented using the Object Oriented paradigm and the Factory Method design pattern. Our main goal is to create a generic platform that allows the researchers to speed up the process of developing and testing new Graph Counterfactual Explanation Methods.
+HANSEL is an open source framework for Evaluating Graph Counterfactual Explanation Methods under data changes (i.e. data distribution drifts). Our main goal is to create a generic platform that allows the researchers to speed up the process of developing and testing new Timed-Graph Counterfactual Explanation Methods.
 
 
 ## Citation Request:
 
-Please cite our paper if you use GRETEL in your experiments:
+Please cite our paper if you use HANSEL in your experiments:
 
-Mario Alfonso Prado-Romero and Giovanni Stilo. 2022. GRETEL: Graph Counterfactual Explanation Evaluation Framework. In Proceedings of the 31st ACM International Conference on Information and Knowledge Management (CIKM '22). Association for Computing Machinery, New York, NY, USA. https://doi.org/10.1145/3511808.3557608
+Prenkaj, B.; Villaiz ́an-Vallelado, M.; Leemann, T.; and Kasneci, G. 2023. Adapting to Change: Robust Counterfactual Explanations in Dynamic Data Landscapes. In Proceedings of The European Conference on Machine Learning and Principles and Practice of Knowledge Discovery (ECML PKDD 2023)
 
 ```latex:
-@inproceedings{prado-romero2022gretel,
-  title={GRETEL: Graph Counterfactual Explanation Evaluation Framework},
-  author={Prado-Romero, Mario Alfonso and Stilo, Giovanni},
-  publisher = {Association for Computing Machinery},
-  address = {New York, NY, USA},
-  isbn = {9781450392365},
-  year={2022},
-  doi = {10.1145/3511808.3557608},
-  booktitle={Proceedings of the 31st ACM International Conference on Information and Knowledge Management},
-  location = {Atlanta, GA, USA},
-  series = {CIKM '22}
+@inproceedings{prenkaj2023dygrace,
+  title={Adapting to Change: Robust Counterfactual Explanations in Dynamic Data Landscapes},
+  author={Bardh Prenkaj and Mario Villaizán-Vallelado and Tobias Leemann and Gjergji Kasneci},
+  booktitle={Proceedings of The European Conference on Machine Learning and Principles and Practice of Knowledge Discovery (ECML/PKDD 2023)},
+  year={2023}
 }
 ```
 
@@ -52,13 +46,14 @@ Mario Alfonso Prado-Romero and Giovanni Stilo. 2022. GRETEL: Graph Counterfactua
 * pandas
 * tensorflow (for GCN)
 * jsonpickle (for serialization)
+* torch
 * joblib
 * rdkit (Molecules)
 * exmol (maccs method)
 * networkx (Graphs)
 
 ## Installation:
-The easiest way to get Gretel up and running with all the dependencies is to pull the development Docker image available in [Docker Hub](https://hub.docker.com/):
+The easiest way to get HANSEL up and running with all the dependencies is to pull the development Docker image available in [Docker Hub](https://hub.docker.com/):
 
 ```
 docker pull gretel/gretel:latest
@@ -81,18 +76,9 @@ For simplicity we provide several **makefile** rules for easy interaction with t
 
 ### Datasets:
 
-* **Tree-Cycles** [2]: Synthetic data set where each instance is a graph. The instance can be either a tree or a tree with several cycle patterns connected to the main graph by one edge
+* **DynTree-Cycles**: Synthetic data set where each instance is a graph. The instance can be either a tree or a tree with several cycle patterns connected to the main graph by one edge
 
-* **Tree-Infinity**: It follows the approach of the Tree-Cycles, but instead of cycles, there is an infinity shape.
-
-* **ASD** [3]: Autism Spectrum Disorder (ASD) taken from the Autism Brain Imagine Data Exchange (ABIDE).
-
-* **ADHD** [3]: Attention Deficit Hyperactivity Disorder (ADHD), is taken from the USC Multimodal Connectivity Database (USCD).
-
-* **BBBP** [4]: Blood-Brain Barrier Permeation is a molecular dataset. Predicting if a molecule can permeate the blood-brain barrier.
-
-* **HIV** [4]: It is a molecular dataset that classifies compounds based on their ability to inhibit HIV.
-
+* **DBLP-Coauthors**: It contains graphs where the vertices represent authors, and the connections are co-authorship relationships between two authors.
 
 ### Oracles:
 
@@ -102,19 +88,11 @@ For simplicity we provide several **makefile** rules for easy interaction with t
 
 * **GCN**
 
-* **ASD Custom Oracle** [3] (Rules specific for the ASD dataset)
-
+* **CustomOracle**
 
 ### Explainers:
 
-* **DCE Search**: Distribution Compliant Explanation Search,  mainly used as a baseline, does not make any assumption about the underlying dataset and searches for a counterfactual instance in it.
-
-* **Oblivious Bidirectional Search (OBS)** [3]: It is an heuristic explanation method that uses a 2-stage approach.
-
-* **Data-Driven Bidirectional Search (DBS)** [3]: It follows the same logic as OBS. The main difference is that this method uses the probability (computed on the original dataset) of each edge to appear in a graph of a certain class to drive the counterfactual search process.
-
-* **MACCS** [4]: Model Agnostic Counterfactual Compounds with STONED (MACCS) is specifically designed to work with molecules.
-
+* **DyGRACE**: Dynamic Graph Counterfactual Explainer, a semi-supervised GCE method that uses two representation learners and a logistic regressor to find valid counterfactuals
 
 ## How to use:
 
@@ -122,41 +100,56 @@ Lets see an small example of how to use the framework.
 
 ### Config file
 
-First, we need to create a config json file with the option we want to use in our experiment. In the file config/CIKM/manager_config_example_all.json it is possible to find all options for each componnent of the framework.
+First, we need to create a config json file with the option we want to use in our experiment. In the file config/ECMLPKDD/manager_config_example_dygrace.json it is possible to find all options for each componnent of the framework.
 
 ```json
 {
     "store_paths": [
-        {"name": "dataset_store_path", "address": "/NFSHOME/mprado/CODE/GRETEL/data/datasets/"},
-        {"name": "embedder_store_path", "address": "/NFSHOME/mprado/CODE/GRETEL/data/embedders/"},
-        {"name": "oracle_store_path", "address": "/NFSHOME/mprado/CODE/GRETEL/data/oracles/"},
-        {"name": "explainer_store_path", "address": "/NFSHOME/mprado/CODE/GRETEL/data/explainers/"},
-        {"name": "output_store_path", "address": "/NFSHOME/mprado/CODE/GRETEL/output/"}
+        {"name": "dataset_store_path", "address": "./data/datasets/"},
+        {"name": "embedder_store_path", "address": "./data/embedders/"},
+        {"name": "oracle_store_path", "address": "./data/oracles/"},
+        {"name": "explainer_store_path", "address": "./data/explainers/"},
+        {"name": "output_store_path", "address": "./output/tree-cycles-dynamic"}
     ],
     "datasets": [
-        {"name": "tree-cycles", "parameters": {"n_inst": 500, "n_per_inst": 300, "n_in_cycles": 200} },
-        {"name": "tree-cycles-balanced", "parameters": {"n_inst_class": 250, "n_per_inst": 300, "n_in_cycles": 200} },
-        {"name": "tree-cycles-dummy", "parameters": {"n_inst_class": 250, "n_per_inst": 300, "n_in_cycles": 200} },
-        {"name": "autism", "parameters": {} },
-        {"name": "adhd", "parameters": {} },
-        {"name": "tree-infinity", "parameters": {"n_inst": 500, "n_per_inst": 300, "n_infinities": 10, "n_broken_infinities": 10}},
-        {"name": "bbbp", "parameters": {"force_fixed_nodes": true}},
-        {"name": "bbbp", "parameters": {"force_fixed_nodes": false}},
-        {"name": "hiv", "parameters": {"force_fixed_nodes": false}}
+        {
+            "name": "dynamic_tree_cycles", 
+            "parameters": {
+                "begin_time": 2000,
+                "end_time": 2003,
+                "num_instances_per_snapshot": 100,
+                "n_nodes": 28,
+                "nodes_in_cycle": 7
+            } 
+        }
     ],
     "oracles": [
-        {"name": "knn", "parameters": { "embedder": {"name": "graph2vec", "parameters": {} }, "k": 5 } },
-        {"name": "svm", "parameters": { "embedder": {"name": "graph2vec", "parameters": {} } } },
-        {"name": "asd_custom_oracle", "parameters": {} },
-        {"name": "svm", "parameters": { "embedder": {"name": "rdk_fingerprint", "parameters": {} } } },
-        {"name": "gcn-tf", "parameters": {} }
+        {
+            "name": "dynamic_oracle",
+            "parameters": {
+                "base_oracle" : {
+                    "name": "tree_cycles_custom_oracle", 
+                    "parameters": {}
+                },
+                "first_train_timestamp": 2000
+                
+            }
+            
+        }
     ],
     "explainers": [
-        {"name": "dce_search", "parameters":{"graph_distance": {"name": "graph_edit_distance", "parameters": {}} } },
-        {"name": "dce_search_oracleless", "parameters":{"graph_distance": {"name": "graph_edit_distance", "parameters": {}} } },
-        {"name": "bidirectional_oblivious_search", "parameters":{"graph_distance": {"name": "graph_edit_distance", "parameters": {}} } },
-        {"name": "bidirectional_data-driven_search", "parameters":{"graph_distance": {"name": "graph_edit_distance", "parameters": {}} } },
-        {"name": "maccs", "parameters":{"graph_distance": {"name": "graph_edit_distance", "parameters": {}} } }
+        {
+            "name": "dygrace",
+            "parameters": { 
+                "in_channels": 4,
+                "out_channels": 4,
+                "epochs_ae": 50,
+                "fold_id": 0,
+                "lr": 1e-3,
+                "autoencoder_name":"gae",
+                "encoder_name": "gcn_encoder"
+            } 
+        }
     ],
     "evaluation_metrics": [ 
         {"name": "graph_edit_distance", "parameters": {}},
@@ -172,12 +165,12 @@ First, we need to create a config json file with the option we want to use in ou
 Then to execute the experiment from the main the code would be something like this:
 
 ```python
-from src.evaluation.evaluator_manager import EvaluatorManager
+from src.evaluation.dynamic_graphs.dynamic_evaluator_manager import DynamicEvaluatorManager
 
-config_file_path = '/NFSHOME/mprado/CODE/Themis/config/linux-server/set-1/config_autism_custom-oracle_dce.json'
+config_file_path = './config/ECMLPKDD/manager_config_example_dygrace.json'
 
 print('Creating the evaluation manager.......................................................')
-eval_manager = EvaluatorManager(config_file_path, run_number=0)
+eval_manager = DynamicEvaluatorManager(config_file_path, K=10, run_number=0)
 
 print('Creating the evaluators...................................................................')
 eval_manager.create_evaluators()
@@ -186,17 +179,4 @@ print('Evaluating the explainers................................................
 eval_manager.evaluate()
 ```
 
-Once the result json files are generated it is possible to use the result_stats.py module to generate the tables with the results of the experiments. The tables will be generated as CSV and LaTex. In the examples folder there are some jupyter notebooks, and associated configuration files, that show how to use the framework for evaluating an explainer. Furthermore, they show how to extend GRETEL with new datasets and explainers.
-
-
-## References
-
-1. Prado-Romero, Mario Alfonso, and Giovanni Stilo. "GRETEL: A unified framework for Graph Counterfactual Explanation Evaluation." arXiv preprint arXiv:2206.02957 (2022).
-
-2. Zhitao Ying, Dylan Bourgeois, Jiaxuan You, Marinka Zitnik, and Jure Leskovec. 2019. Gnnexplainer: Generating explanations for graph neural networks. Ad-
-vances in neural information processing systems 32 (2019)
-
-3. Carlo Abrate and Francesco Bonchi. 2021. Counterfactual Graphs for Explainable Classification of Brain Networks. In Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery & Data Mining. 2495–2504
-
-4. Geemi P Wellawatte, Aditi Seshadri, and Andrew D White. 2022. Model agnostic generation of counterfactual explanations for molecules. Chemical science 13, 13
-(2022), 3697–370
+Once the result json files are generated it is possible to use the report_dynamic_stats.py module to generate a json file with the results of the dynamic experiments.
