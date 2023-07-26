@@ -29,6 +29,7 @@ class MEGExplainer(Explainer):
                 polyak=5,
                 fold_id=0,
                 sort_predicate=None,
+                k=10,
                 config_dict=None) -> None:
         
         super().__init__(id, config_dict)
@@ -47,8 +48,7 @@ class MEGExplainer(Explainer):
         self.replay_buffer_size = replay_buffer_size
         self.environment = environment
         self.lr = lr
-        
-        
+        self.k = k       
 
     def explain(self, instance, oracle: Oracle, dataset: Dataset):
         #dataset = self.converter.convert(dataset)              
@@ -61,8 +61,8 @@ class MEGExplainer(Explainer):
         instance = dataset.get_instance(instance.id)
         
         with torch.no_grad():
-            inst = self.cf_queue.get(0) # get the best counterfactual
-            return inst['next_state']
+            counterfactuals = self.cf_queue.slice(self.k)
+            return [cf_inst['next_state'] for cf_inst in counterfactuals]
 
     def save_explainers(self):
         self.explainer.save(os.path.join(self.explainer_store_path, self.name))

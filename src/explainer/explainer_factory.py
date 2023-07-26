@@ -9,7 +9,7 @@ from src.evaluation.evaluation_metric_factory import EvaluationMetricFactory
 from src.explainer.dynamic_graphs.ada_gce import AdaptiveGCE
 from src.explainer.dynamic_graphs.contrastive_models.contrastive_dygrace import \
     ContrastiveDyGRACE
-from explainer.dynamic_graphs.explainer_dygrace import DyGRACE
+from src.explainer.dynamic_graphs.explainer_dygrace import DyGRACE
 from src.explainer.ensemble.ensemble_factory import EnsembleFactory
 from src.explainer.explainer_base import Explainer
 from src.explainer.explainer_bidirectional_search import (
@@ -135,11 +135,12 @@ class ExplainerFactory:
             n_labels = explainer_parameters['n_labels']
             fold_id = explainer_parameters['fold_id']
             ce_binarization_threshold = explainer_parameters.get('ce_binarization_threshold', None)
-            
+            top_k_cf = explainer_parameters.get('top_k_cf', 10
+                                                )
             return self.get_countergan_explainer(n_nodes, batch_size_ratio, device,
                                                  training_iterations, n_discriminator_steps,
                                                  n_generator_steps, n_labels, fold_id,
-                                                 ce_binarization_threshold, explainer_dict)
+                                                 ce_binarization_threshold, top_k_cf, explainer_dict)
             
         elif explainer_name == 'clear':
             # Verifying the explainer parameters
@@ -167,6 +168,7 @@ class ExplainerFactory:
             lambda_sim = explainer_parameters.get('lambda_sim', 1)
             lambda_kl = explainer_parameters.get('lambda_kl', 1)
             lambda_cfe = explainer_parameters.get('lambda_cfe', 1)
+            top_k_cf = explainer_parameters.get('top_k_cf', 10)
             
             assert feature_dim >= 2
             
@@ -183,7 +185,7 @@ class ExplainerFactory:
                                             epochs, alpha, beta_x, beta_adj,
                                             feature_dim, lr, weight_decay,
                                             lambda_sim, lambda_kl, lambda_cfe,
-                                            fold_id, explainer_dict)
+                                            fold_id, top_k_cf, explainer_dict)
             
         elif explainer_name == 'cf2':
             if not 'n_nodes' in explainer_parameters:
@@ -256,6 +258,7 @@ class ExplainerFactory:
             polyak = explainer_parameters.get('polyak', 0.995)
             sort_predicate = lambda result : result['reward']
             num_counterfactuals = explainer_parameters.get('num_counterfactuals', 10)
+            top_k_cf = explainer_parameters.get('top_k_cf', 10)
             
             
             fold_id = int(explainer_parameters['fold_id'])
@@ -265,7 +268,7 @@ class ExplainerFactory:
                                           num_epochs, max_step_per_episode,
                                           update_interval, gamma, polyak,
                                           sort_predicate, fold_id, num_counterfactuals,
-                                          batch_size,
+                                          batch_size, top_k_cf,
                                           explainer_dict)
             
         elif explainer_name == 'perturbation_rand':
@@ -461,7 +464,7 @@ class ExplainerFactory:
                           replay_buffer_size, num_epochs,
                           max_step_per_episode, update_interval, gamma,
                           polyak, sort_predicate, fold_id, num_counterfactuals,
-                          batch_size,
+                          batch_size, top_k_cf,
                           config_dict=None) -> Explainer:
         
         result = MEGExplainer(id=self._explainer_id_counter,
@@ -478,6 +481,7 @@ class ExplainerFactory:
                               sort_predicate=sort_predicate,
                               fold_id=fold_id,
                               num_input=num_input,
+                              k=top_k_cf,
                               config_dict=config_dict)
         self._explainer_id_counter += 1
         return result
@@ -542,7 +546,7 @@ class ExplainerFactory:
     
     def get_countergan_explainer(self, n_nodes, batch_size_ratio, device,
                                  training_iterations, n_discriminator_steps, n_generator_steps,
-                                 n_labels, fold_id, ce_binarization_threshold, config_dict=None) -> Explainer:
+                                 n_labels, fold_id, ce_binarization_threshold, top_k_cf, config_dict=None) -> Explainer:
         result = CounteRGANExplainer(self._explainer_id_counter,
                                      self._explainer_store_path,
                                      n_nodes=n_nodes,
@@ -553,7 +557,7 @@ class ExplainerFactory:
                                      n_generator_steps=n_generator_steps,
                                      n_discriminator_steps=n_discriminator_steps,
                                      ce_binarization_threshold=ce_binarization_threshold,
-                                     fold_id=fold_id, config_dict=config_dict)
+                                     fold_id=fold_id, k=top_k_cf, config_dict=config_dict)
         self._explainer_id_counter += 1
         return result
        
@@ -562,7 +566,7 @@ class ExplainerFactory:
                             h_dim, z_dim, dropout, encoder_type, graph_pool_type,
                             disable_u, epochs, alpha, beta_x, beta_adj, feature_dim,
                             lr, weight_decay, lambda_sim, lambda_kl, lambda_cfe,
-                            fold_id, config_dict=None) -> Explainer:
+                            fold_id, top_k_cf, config_dict=None) -> Explainer:
         
         result = CLEARExplainer(self._explainer_id_counter,
                                 self._explainer_store_path,
@@ -586,6 +590,7 @@ class ExplainerFactory:
                                 lambda_kl=lambda_kl,
                                 lambda_cfe=lambda_cfe,
                                 fold_id=fold_id,
+                                k=top_k_cf,
                                 config_dict=config_dict)
         self._explainer_id_counter += 1
         return result

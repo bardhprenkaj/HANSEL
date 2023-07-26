@@ -20,7 +20,7 @@ class DynamicOracle(Oracle):
         snapshot_dataset = dataset.dynamic_graph.get(timestamp, None)
         if snapshot_dataset:
             # fit the base model with the current snapshot
-            self.base_oracle.fit(snapshot_dataset, -1)
+            self.base_oracle.fit(snapshot_dataset, timestamp)
                         
             
     def _real_predict(self, data_instance):

@@ -34,3 +34,9 @@ class SortedQueue:
     
     def length(self):
         return len(self.data_)
+    
+    def slice(self, k):
+        retr = list()
+        for i in range(k):
+            retr.append(self.get(i))
+        return retr

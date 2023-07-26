@@ -33,8 +33,6 @@ class MorganBitFingerprintActionEncoder(ActionEncoderAB):
     def __init__(self, fp_len=1024, fp_rad=2):
         super(MorganBitFingerprintActionEncoder, self).__init__()
         self._name = 'morgan_bit_fingerprint_action_encoder'
-        print(fp_len, type(fp_len))
-        print(fp_rad, type(fp_rad))
         self.fp_length = fp_len
         self.fp_radius = fp_rad
         

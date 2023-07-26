@@ -13,7 +13,6 @@ for i, file in enumerate(filenames):
 
     print('Creating the evaluation manager.......................................................')
     eval_manager = DynamicEvaluatorManager(config_file_path, K=10, run_number=i)
-
     print('Creating the evaluators...................................................................')
     eval_manager.create_evaluators()
 

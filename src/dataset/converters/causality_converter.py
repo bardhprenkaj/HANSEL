@@ -3,8 +3,6 @@ import numpy as np
 from src.dataset.converters.abstract_converter import ConverterAB
 from src.dataset.data_instance_base import DataInstance
 from src.dataset.data_instance_causality import CausalDataInstance
-from src.dataset.data_instance_features import DataInstanceWFeatures, DataInstanceWFeaturesAndWeights
-from src.dataset.dataset_base import Dataset
 
             
 class DefaultCausalityConverter(ConverterAB):
@@ -27,7 +25,9 @@ class DefaultCausalityConverter(ConverterAB):
 
         if not hasattr(instance, 'features'):
             converted_instance.features = self.__create_dummy_features(instance)
-            
+        else:
+            converted_instance.features = instance.features
+                        
         splt = np.linspace(0.15, 1.0, num=self.causality_dim_choice + 1)
         min_1, max_1 = splt[:self.causality_dim_choice], splt[1:]
         
@@ -40,7 +40,7 @@ class DefaultCausalityConverter(ConverterAB):
         feat_add = feat_x1.repeat(instance.graph.number_of_nodes()).reshape(-1,1)
         
         self.u_dim = len(np.unique(self.data_causality_dims))
-        
+                
         converted_instance.features = np.concatenate([feat_add, converted_instance.features], axis=1)
         converted_instance.causality = gen_causality
         

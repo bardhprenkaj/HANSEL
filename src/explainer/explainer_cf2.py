@@ -57,35 +57,38 @@ class CF2Explainer(Explainer):
         )
         
     def explain(self, instance: DataInstance, oracle: Oracle, dataset: Dataset):
-        dataset = self.converter.convert(dataset)
-        
-        if(not self._fitted):
-            self.explainer.train()
-            self.fit(dataset, oracle)
+        try:
+            dataset = self.converter.convert(dataset)
 
-        self.explainer.eval()
-        
-        with torch.no_grad():
-            features_and_weight_instance = dataset.get_instance(instance.id)
-            adj = features_and_weight_instance.to_numpy_array()
-            weights = features_and_weight_instance.weights
-            features = features_and_weight_instance.features
-            
-            g = from_networkx(nx.from_numpy_array(adj))
-            # set node features of the graph
-            g.ndata['feat'] = torch.from_numpy(features).float()
-            # set the edge weights of the graph
-            g.edata['weights'] = torch.from_numpy(weights).float()
-            
-            weighted_adj = self.explainer._rebuild_weighted_adj(g)
-            masked_adj = self.explainer.get_masked_adj(weighted_adj).numpy()
+            if(not self._fitted):
+                self.explainer.train()
+                self.fit(dataset, oracle)
 
-            cf_instance = DataInstanceWFeaturesAndWeights(instance.id)
-            cf_instance.from_numpy_array(masked_adj)
-            cf_instance = self.converter.convert_instance(cf_instance)    
-                    
-            print(f'Finished evaluating for instance {instance.id}')
-            return cf_instance
+            self.explainer.eval()
+            
+            with torch.no_grad():
+                features_and_weight_instance = dataset.get_instance(instance.id)
+                adj = features_and_weight_instance.to_numpy_array()
+                weights = features_and_weight_instance.weights
+                features = features_and_weight_instance.features
+                
+                g = from_networkx(nx.from_numpy_array(adj))
+                # set node features of the graph
+                g.ndata['feat'] = torch.from_numpy(features).float()
+                # set the edge weights of the graph
+                g.edata['weights'] = torch.from_numpy(weights).float()
+                
+                weighted_adj = self.explainer._rebuild_weighted_adj(g)
+                masked_adj = self.explainer.get_masked_adj(weighted_adj).numpy()
+
+                cf_instance = DataInstanceWFeaturesAndWeights(instance.id)
+                cf_instance.from_numpy_array(masked_adj)
+                cf_instance = self.converter.convert_instance(cf_instance)    
+                        
+                print(f'Finished evaluating for instance {instance.id}')
+                return [cf_instance]
+        except:
+            return [instance]
 
     def save_explainers(self):
         torch.save(
@@ -113,17 +116,17 @@ class CF2Explainer(Explainer):
             self.save_explainers()
 
     def __fit(self, dataset: Dataset, oracle: Oracle):
-        graphs, _ = self.transform_data(dataset)
+        graphs, labels = self.transform_data(dataset)
         
         self.explainer.train()
         for epoch in range(self.epochs):
             
             losses = list()
             
-            for graph in graphs:
+            for i, graph in enumerate(graphs):
                 graph = graph.to(self.device)
 
-                pred1, pred2 = self.explainer(graph, oracle)
+                pred1, pred2 = self.explainer(graph, oracle, label=labels[i])
                 
                 loss = self.explainer.loss(graph,
                                            pred1, pred2,
@@ -135,6 +138,8 @@ class CF2Explainer(Explainer):
                 self.optimizer.step()
             
             print(f"Epoch {epoch+1} --- loss {np.mean(losses)}")
+            
+        self._fitted = True
 
     def transform_data(self, dataset: Dataset):
         adj  = np.array([i.to_numpy_array() for i in dataset.instances])
@@ -157,7 +162,7 @@ class ExplainModelGraph(torch.nn.Module):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.mask = self.build_adj_mask()
 
-    def forward(self, graph, oracle):        
+    def forward(self, graph, oracle, label=None, index=None):        
         adjacency = nx.to_numpy_array(to_networkx(graph))
         weights = graph.edata['weights'].detach().numpy()
         features = graph.ndata['feat'].detach().numpy()
@@ -165,7 +170,8 @@ class ExplainModelGraph(torch.nn.Module):
         instance = DataInstanceWFeaturesAndWeights(-1)
         instance.from_numpy_array(adjacency)
         instance.weights = weights
-        instance.features = features 
+        instance.features = features
+        instance.graph_label = label 
         pred1 = oracle.predict(instance)
 
         # re-build weighted adjacency matrix

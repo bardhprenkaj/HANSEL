@@ -1,5 +1,6 @@
 import os
 from numbers import Number
+from typing import List
 
 import numpy as np
 import torch
@@ -41,6 +42,7 @@ class CLEARExplainer(Explainer):
                  beta_x=10,
                  beta_adj=10,
                  fold_id=0,
+                 k=10,
                  config_dict=None) -> None:
         
         super().__init__(id, config_dict)
@@ -60,6 +62,7 @@ class CLEARExplainer(Explainer):
         self.beta_x = beta_x
         self.beta_adj = beta_adj
         self.feature_dim = feature_dim
+        self.k = k
                 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -83,7 +86,10 @@ class CLEARExplainer(Explainer):
         self._fitted = False
                 
     def explain(self, instance, oracle: Oracle, dataset: Dataset):
-        dataset = self.converter.convert(dataset)      
+        try:
+            dataset = self.converter.convert(dataset)
+        except ValueError: # some instances cannot be converted
+            return [instance]
         
         if(not self._fitted):
             self.fit(oracle, dataset, self.fold_id)
@@ -100,14 +106,18 @@ class CLEARExplainer(Explainer):
             model_return = self.explainer(features, u, adj, labels)
             adj_reconst, features_reconst = model_return['adj_reconst'], model_return['features_reconst']
             
-            adj_reconst_binary = torch.bernoulli(adj_reconst.squeeze())
-            
-            cf_instance = DataInstanceWFeatures(instance.id)
-            cf_instance.from_numpy_array(adj_reconst_binary.detach().numpy())
-            cf_instance.features = features_reconst.squeeze().detach().numpy()
+            counterfactuals: List[DataInstanceWFeatures] = []
+            for _ in range(self.k):
+                adj_reconst_binary = torch.bernoulli(adj_reconst.squeeze())
+                
+                cf_instance = DataInstanceWFeatures(instance.id)
+                cf_instance.from_numpy_array(adj_reconst_binary.detach().numpy())
+                cf_instance.features = features_reconst.squeeze().detach().numpy()
+                
+                counterfactuals.append(cf_instance)
             
             print(f'Finished evaluating for instance {instance.id}')
-            return cf_instance
+            return counterfactuals
 
     def save_explainers(self):
         torch.save(self.explainer.state_dict(),
@@ -190,8 +200,8 @@ class CLEARExplainer(Explainer):
         
         
     def __compute_loss(self, params):
-        model, oracle, z_mu, z_logvar, adj_permuted, features_permuted, adj_reconst, features_reconst, \
-            adj_input, features_input, y_cf, z_u_mu, z_u_logvar, z_mu_cf, z_logvar_cf = params['model'], params['oracle'], params['z_mu'], \
+        _, oracle, z_mu, z_logvar, adj_permuted, features_permuted, adj_reconst, features_reconst, \
+            _, _, y_cf, z_u_mu, z_u_logvar, z_mu_cf, z_logvar_cf = params['model'], params['oracle'], params['z_mu'], \
                 params['z_logvar'], params['adj_permuted'], params['features_permuted'], params['adj_reconst'], params['features_reconst'], \
                     params['adj_input'], params['features_input'], params['y_cf'], params['z_u_mu'], params['z_u_logvar'], params['z_mu_cf'], params['z_logvar_cf']
                     
@@ -245,6 +255,11 @@ class CLEARExplainer(Explainer):
         X_causality = np.array([i.causality for i in dataset.instances])
         y = np.array([i.graph_label for i in dataset.instances])[..., np.newaxis]
         
+        # adj.shape = n x n
+        X_adj = self.__pad(X_adj)
+        # feature.shape = n x k
+        X_features = self.__pad(X_features, is_adj=False)
+            
         X_adj = X_adj[dataset.get_split_indices()[fold_id]['train']]
         X_features = X_features[dataset.get_split_indices()[fold_id]['train']]
         X_causality = X_causality[dataset.get_split_indices()[fold_id]['train']]
@@ -264,6 +279,23 @@ class CLEARExplainer(Explainer):
                             drop_last=True)
         
         return loader
+    
+    
+    def __pad(self, arr, is_adj=True):
+        # pad the array to the highest number of nodes
+        # Find the maximum number of columns (second dimension) among all matrices
+        max_cols = max(matrix.shape[0] for matrix in arr)
+        # Initialize a new tensor to store the padded matrices
+        if is_adj:
+            padded_tensor = np.zeros((arr.shape[0], max_cols, max_cols))
+        else:
+            padded_tensor = np.zeros((arr.shape[0], max_cols, arr[0].shape[-1]))
+        # Pad each matrix in the tensor
+        for i in range(arr.shape[0]):
+            rows, cols = arr[i].shape
+            padded_tensor[i, :rows, :cols] = arr[i]
+        padded_tensor = padded_tensor.astype(np.float64)
+        return padded_tensor
     
         
 class CLEAR(nn.Module):
@@ -359,17 +391,16 @@ class CLEAR(nn.Module):
         # Q(Z | X, U, A, Y^CF)
         # input: x, u, A, y^cf
         # output: z
-        graph_rep = self.graph_model(features, adj) # n x num_node x h_dim
+        graph_rep = self.graph_model(x=features, adj=adj, add_loop=False) # n x num_node x h_dim
         graph_rep  = self.graph_pooling(graph_rep, self.graph_pool_type) # n x h_dim
         # graph_rep = self.graph_norm(graph_rep)
-        
         if self.disable_u:
             z_mu = self.encoder_mean(torch.cat((graph_rep, y_cf), dim=1))
             z_logvar = self.encoder_var(torch.cat((graph_rep, y_cf), dim=1))
         else:
             z_mu = self.encoder_mean(torch.cat((graph_rep, u, y_cf), dim=1))
             z_logvar = self.encoder_var(torch.cat((graph_rep, u, y_cf), dim=1))
-            
+
         return z_mu, z_logvar
     
     def get_represent(self, features, u, adj, y_cf):
@@ -433,8 +464,7 @@ class CLEAR(nn.Module):
         z_mu, z_logvar = self.encoder(features, u_onehot, adj, y_cf)
         # reparametrize
         z_sample = self.reparametrize(z_mu, z_logvar)
-        # decoder
-        
+        # decoder        
         features_reconst, adj_reconst = self.decoder(z_sample, y_cf, u_onehot)
         
         return {

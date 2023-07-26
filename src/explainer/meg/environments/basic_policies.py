@@ -59,7 +59,7 @@ class AddRemoveEdgesEnvironment(BaseEnvironment):
     
     def reward(self):     
         return {
-            'reward': self.reward_fn(self._state, self._init_instance)
+            'reward': self.reward_fn(self._state, [self._init_instance])
         }
     
     def step(self, action):

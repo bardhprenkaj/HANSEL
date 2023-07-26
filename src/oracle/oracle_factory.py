@@ -106,7 +106,7 @@ class OracleFactory(ABC):
             fold_id = oracle_parameters.get('fold_id', 0)                
             percentile = oracle_parameters.get('percentile', 75)
             fit = oracle_parameters.get('fit', False)
-            first_train_timestamp = oracle_parameters.get('first_train_timestamp', 0)
+            first_train_timestamp = oracle_parameters.get('first_train_timestamp', 2000)
             
             return self.get_dblp_coauthorship_custom_oracle(dataset,
                                                             percentile=percentile,

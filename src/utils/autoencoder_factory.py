@@ -27,7 +27,7 @@ class AEFactory:
         if model_name.lower() == 'gae':
             return CustomGAE(encoder=encoder, decoder=decoder)
         if model_name.lower() == 'contrastive_gae':
-            return ContrastiveGAE(encoder=encoder, decoder=decoder)
+            return ContrastiveGAE(encoder=encoder, decoder=decoder, **kwargs)
         else:
             raise NameError(f"The model name {model_name} isn't supported.")
     
@@ -57,7 +57,8 @@ class AEFactory:
                           dec_name: str,
                           in_channels: int = 8,
                           out_channels: int = 64,
-                          num_classes: int=2) -> List[nn.Module]:
+                          num_classes: int=2,
+                          separation_margin=1) -> List[nn.Module]:
         
         return [
             self.get_model(model_name=autoencoder_name,
@@ -66,9 +67,10 @@ class AEFactory:
                                                     out_channels=out_channels),
                            decoder=self.get_decoder(name=dec_name,
                                                     in_channels=in_channels,
-                                                    out_channels=out_channels))\
-                                                        .double().to(self.device)\
-                                                            for _ in range(num_classes)
+                                                    out_channels=out_channels),
+                           margin=separation_margin)\
+                               .double().to(self.device)\
+                                   for _ in range(num_classes)
         ]
     
 class SiameseFactory:

@@ -1,19 +1,18 @@
 import os
 from typing import Dict
 
+import jsonpickle
 import networkx as nx
 import numpy as np
-import jsonpickle
 
 from src.dataset.data_instance_base import DataInstance
 from src.dataset.dataset_base import Dataset
 from src.oracle.oracle_base import Oracle
 
 
-
 class DBLPCoAuthorshipCustomOracle(Oracle):
 
-    def __init__(self, id, oracle_store_path, first_train_timestamp=0, percentile=75, fold_id=0, config_dict=None) -> None:
+    def __init__(self, id, oracle_store_path, first_train_timestamp=2000, percentile=75, fold_id=0, config_dict=None) -> None:
         super().__init__(id, oracle_store_path, config_dict)
         self._name = 'dblp_coauthorship_custom_oracle'
         self.fold_id = fold_id        
@@ -27,7 +26,7 @@ class DBLPCoAuthorshipCustomOracle(Oracle):
             self.read_oracle(self._name)
         else:
             self.weight_dict: Dict[int: float] = {}
-            for instance in dataset.dynamic_graph[self.first_train_timestamp].instances:
+            for instance in dataset.instances:
                 weights = list(nx.get_edge_attributes(instance.graph, 'weight').values())
                 self.weight_dict[instance.id] = np.mean(weights) if len(weights) > 0 else 0
             self.percentile_value = np.percentile(list(self.weight_dict.values()), self.percentile)
@@ -35,7 +34,9 @@ class DBLPCoAuthorshipCustomOracle(Oracle):
             self.write_oracle()
 
     def _real_predict(self, data_instance: DataInstance):
-        return 1 if self.weight_dict[data_instance.id] > self.percentile_value else 0
+        weights = list(nx.get_edge_attributes(data_instance.graph, 'weight').values())
+        mean_weights = np.mean(weights) if len(weights) > 0 else 0
+        return 1 if mean_weights > self.percentile_value else 0
         
     def _real_predict_proba(self, data_instance):
         return np.array([0, 1]) if self._real_predict(data_instance) else np.array([1, 0])

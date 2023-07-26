@@ -1,3 +1,4 @@
+from typing import List
 from src.explainer.explainer_base import Explainer
 from src.dataset.dataset_base import Dataset
 from src.oracle.oracle_base import Oracle
@@ -26,6 +27,7 @@ class CounteRGANExplainer(Explainer):
                  ce_binarization_threshold=.5,
                  fold_id=0,
                  device='cuda',
+                 k=10,
                  config_dict=None) -> None:
         
         super().__init__(id, config_dict)
@@ -43,7 +45,7 @@ class CounteRGANExplainer(Explainer):
         self.ce_binarization_threshold = ce_binarization_threshold
         self.fold_id = fold_id
         self._fitted = False
-        
+        self.k = k
         # multi-class support
         self.explainers = [
             CounteRGAN(n_nodes,
@@ -59,13 +61,6 @@ class CounteRGANExplainer(Explainer):
             if y != desired_label:
                 break
         return y
-    """def _get_explainer(self, ignore_class):
-        y = -1
-        while True:
-            y = np.random.randint(low=0, high=self.n_labels)
-            if y != ignore_class:
-                break
-        return self.explainers[y].generator"""
 
     def explain(self, instance, oracle: Oracle, dataset: Dataset):
         if(not self._fitted):
@@ -80,11 +75,15 @@ class CounteRGANExplainer(Explainer):
             explainer = self.explainers[np.argmax(pred_scores)].generator
             """ignore_index = np.argmax(pred_scores)"""
             explainer.eval()
-            counterfactual = explainer(torch_data_instance).squeeze().cpu().numpy()
-            cf_instance = DataInstance(instance.id)
-            cf_instance.from_numpy_array(counterfactual, store=True)
             
-            return cf_instance
+            counterfactuals: List[DataInstance] = []
+            for _ in range(self.k):
+                counterfactual = explainer(torch_data_instance).squeeze().cpu().numpy()
+                cf_instance = DataInstance(instance.id)
+                cf_instance.from_numpy_array(counterfactual, store=True)
+                counterfactuals.append(cf_instance)
+            
+            return counterfactuals
     
 
     def save_explainers(self):
@@ -242,8 +241,8 @@ class CounteRGANExplainer(Explainer):
                 G_losses.append(loss.item())
                 countergan_optimizer.step()
                 
-            # print(f'Iteration [{iteration}/{self.training_iterations}]'\
-            #         +f'\tLoss_D: {np.mean(D_losses)}\tLoss_G: {np.mean(G_losses)}')
+            print(f'Iteration [{iteration}/{self.training_iterations}]'\
+                +f'\tLoss_D: {np.mean(D_losses)}\tLoss_G: {np.mean(G_losses)}')
     
 
     def transform_data(self, dataset: Dataset, fold_id=0, class_to_explain=0):
