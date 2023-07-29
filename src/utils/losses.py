@@ -1,8 +1,9 @@
 import torch
 
 class SupervisedContrastiveLoss(torch.nn.Module):
+  
   def __init__(self, margin=2.0):
-    super(SupervisedContrastiveLoss, self).__init__()  # pre 3.3 syntax
+    super().__init__()
     self.margin = margin  # margin or radius
 
   def forward(self, y1, y2, d=0):

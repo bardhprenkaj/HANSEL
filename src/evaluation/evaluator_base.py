@@ -73,6 +73,10 @@ class Evaluator(ABC):
     @explanations.setter
     def explanations(self, new_explanations_list):
         self._explanations = new_explanations_list
+        
+    @property
+    def explainer(self):
+        return self._explainer
 
 
     def get_instance_explanation_pairs(self):

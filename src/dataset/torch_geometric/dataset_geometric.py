@@ -7,14 +7,30 @@ from src.dataset.data_instance_base import DataInstance
 class TorchGeometricDataset(Dataset):
   
   def __init__(self, instances):
-    super(TorchGeometricDataset, self).__init__()
-    self.instances = instances
+    super(TorchGeometricDataset, self).__init__()    
+    self.instances = []
+    self._process(instances)
     
   def len(self):
     return len(self.instances)
   
   def get(self, idx):
     return self.instances[idx]
+  
+  def _process(self, instances):
+    for instance in instances:
+      graph = self.to_geometric(instance)
+      self.instances.append(graph)
+      
+  def to_geometric(self, instance: DataInstance, label=0) -> Data:   
+    adj = torch.from_numpy(instance.to_numpy_array()).double()
+    x = torch.from_numpy(instance.features).double()
+
+    a = torch.nonzero(torch.triu(adj))
+    w = adj[a[:,0], a[:,1]]
+    
+    return Data(x=x, y=label, edge_index=a.T, edge_attr=w)
+  
   
   
 

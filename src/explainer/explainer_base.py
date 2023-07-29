@@ -33,3 +33,6 @@ class Explainer(ABC):
 
     def explain(self, instance, oracle: Oracle, dataset: Dataset) -> List[DataInstance]:
         pass
+    
+    def update(self):
+        pass

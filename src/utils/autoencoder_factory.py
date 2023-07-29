@@ -1,12 +1,13 @@
 from typing import List
 
-import torch.nn as nn
 import torch
+import torch.nn as nn
 
-from src.utils.autoencoders import ContrastiveGAE, CustomGAE
-from src.utils.encoders import GCNEncoder, GraphSAGE
 from src.explainer.dynamic_graphs.contrastive_models.siamese_modules import \
     DenseSiamese
+from src.utils.autoencoders import ContrastiveGAE, CustomGAE, CustomVGAE
+from src.utils.decoders import SimpleLinearDecoder
+from src.utils.encoders import GCNEncoder, GraphSAGE, VariationalGCNEncoder
 
 
 class AEFactory:
@@ -21,9 +22,8 @@ class AEFactory:
                   decoder: nn.Module = None,
                   **kwargs) -> nn.Module:
         
-        """if model_name.lower() == 'vgae':
-            return CustomVGAE(encoder=encoder, decoder=decoder)"""
-        
+        if model_name.lower() == 'vgae':
+            return CustomVGAE(encoder=encoder, decoder=decoder, **kwargs)        
         if model_name.lower() == 'gae':
             return CustomGAE(encoder=encoder, decoder=decoder)
         if model_name.lower() == 'contrastive_gae':
@@ -40,15 +40,21 @@ class AEFactory:
             return GCNEncoder(in_channels=in_channels, out_channels=out_channels)
         elif name.lower() == 'graph_sage':
             return GraphSAGE(in_channels=in_channels, hidden_dim=out_channels)
+        elif name.lower() == 'var_gcn_encoder':
+            return VariationalGCNEncoder(in_channels=in_channels, out_channels=out_channels)
         else:
             raise NameError(f"The encoder {name} isn't supported.")
         
     def get_decoder(self,
                     name,
-                    in_channels=1,
-                    out_channels=64,
+                    input_dim=8,
+                    hidden_dim=128,
                     **kwargs) -> nn.Module:
-        return None # to be changed in the future. For now InnerProduct is fine.                
+        if name == 'simple_linear_decoder':
+            return SimpleLinearDecoder(input_dim=input_dim,
+                                       hidden_dim=hidden_dim)
+            
+        return None # default to the InnerProduct              
     
     
     def init_autoencoders(self,
@@ -66,8 +72,8 @@ class AEFactory:
                                                     in_channels=in_channels,
                                                     out_channels=out_channels),
                            decoder=self.get_decoder(name=dec_name,
-                                                    in_channels=in_channels,
-                                                    out_channels=out_channels),
+                                                    input_dim=in_channels,
+                                                    hidden_dim=out_channels),
                            margin=separation_margin)\
                                .double().to(self.device)\
                                    for _ in range(num_classes)

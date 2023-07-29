@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, SAGEConv
 from torch_geometric.nn.pool import global_mean_pool
-
+import numpy as np
 
 class Encoder(ABC):
     
@@ -68,3 +68,25 @@ class GCNEncoder(nn.Module, Encoder):
                     
     def set_training(self, training):
         self.training = training
+        
+        
+class VariationalGCNEncoder(nn.Module, Encoder):
+
+    def __init__(self,
+                 in_channels=1,
+                 out_channels=64):
+
+        super(VariationalGCNEncoder, self).__init__()
+        self.conv1 = GCNConv(in_channels, 2 * out_channels)
+        self.conv2 = GCNConv(2 * out_channels, 4 * out_channels)
+
+        self.conv_mu = GCNConv(4 * out_channels, out_channels)
+        self.conv_logstd = GCNConv(4 * out_channels, out_channels)
+
+    def forward(self, x, edge_index, edge_weight):
+        x = F.relu(self.conv1(x, edge_index, edge_weight))
+        x = F.relu(self.conv2(x, edge_index, edge_weight))
+        return self.conv_mu(x, edge_index, edge_weight), self.conv_logstd(x, edge_index, edge_weight)
+    
+    def encode(self, graph, edge_index, edge_attr, **kwargs):
+        return self.forward(graph, edge_index, edge_attr)
