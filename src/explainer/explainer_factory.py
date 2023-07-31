@@ -372,31 +372,52 @@ class ExplainerFactory:
         elif explainer_name == 'condgce':
             if 'weight_schedulers' not in explainer_parameters:
                 raise ValueError('''ConDGCE needs to have the weight schedulers specified''')
-            
+            if 'decoder' not in explainer_parameters:
+                raise ValueError('''ConDGCE needs to have a decoder specified''')
+            if 'encoder' not in explainer_parameters:
+                raise ValueError('''ConDGCE needs to have an encoder specified''')
+            #########################################################################
+            # encoder parameters
+            encoder = explainer_parameters['encoder']
+            encoder_name = encoder.get('name', 'vgae_')
+            if 'parameters' not in encoder:
+                raise ValueError('''The encoder of ConDGCE needs to have parameters, even if they're empty''')
+            encoder_params = encoder['parameters']
+            #########################################################################
+            # decoder parameters
+            decoder = explainer_parameters['decoder']
+            decoder_name = decoder.get('name', None)
+            if 'parameters' not in decoder:
+                raise ValueError('''The decoder of ConDGCE needs to have parameters, even if they're empty''')
+            decoder_params = decoder['parameters']
+            ########################################################################            
             schedulers = explainer_parameters['weight_schedulers']
             # we only need two weight schedulers
             assert(len(schedulers) == 2)
             
             fold_id = explainer_parameters.get('fold_id', 0)
             num_classes = explainer_parameters.get('num_classes', 2)
-            in_channels = explainer_parameters.get('in_channels', 1)
-            out_channels = explainer_parameters.get('out_channels', 4)
             batch_size = explainer_parameters.get('batch_size', 24)
             lr = explainer_parameters.get('lr', 1e-3)
             epochs_ae = explainer_parameters.get('epochs_ae', 100)
             top_k_cf = explainer_parameters.get('top_k_cf', 10)
+            in_dim = explainer_parameters.get('in_dim', 4)
+            decoder_dims = explainer_parameters.get('decoder_dims', 3)
+            replace_rate = explainer_parameters.get('replace_rate', .1)
+            mask_rate = explainer_parameters.get('mask_rate', .3)           
             
-            kl_weight = explainer_parameters.get('kl_weight', 2)
-            
-            dec_name = explainer_parameters.get('decoder_name', None)
+            encoder = self._autoencoder_factory.get_encoder(encoder_name, **encoder_params)
+            decoder = self._autoencoder_factory.get_decoder(decoder_name, **decoder_params)
             
             autoencoders = self._autoencoder_factory.init_autoencoders(autoencoder_name='vgae',
-                                                                       enc_name='var_gcn_encoder',
-                                                                       dec_name=dec_name,
-                                                                       in_channels=in_channels,
-                                                                       out_channels=out_channels,
-                                                                       num_classes=num_classes,
-                                                                       separation_margin=kl_weight)
+                                                                       encoder=encoder,
+                                                                       decoder=decoder,
+                                                                       kwargs={
+                                                                           'in_dim': in_dim,
+                                                                           'decoder_dims': decoder_dims,
+                                                                           'replace_rate': replace_rate,
+                                                                           'mask_rate': mask_rate
+                                                                       })
             
             schedulers = tuple([self._weight_scheduler_factory.get_scheduler_by_name(weight_dict) for weight_dict in schedulers])
             alpha_scheduler, beta_scheduler = schedulers

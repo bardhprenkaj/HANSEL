@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from typing import List
 
 import torch
@@ -6,7 +7,7 @@ import torch.nn as nn
 from src.explainer.dynamic_graphs.contrastive_models.siamese_modules import \
     DenseSiamese
 from src.utils.autoencoders import ContrastiveGAE, CustomGAE, CustomVGAE
-from src.utils.decoders import SimpleLinearDecoder
+from src.utils.decoders import SimpleLinearDecoder, GATDecoder
 from src.utils.encoders import GCNEncoder, GraphSAGE, VariationalGCNEncoder
 
 
@@ -31,52 +32,43 @@ class AEFactory:
         else:
             raise NameError(f"The model name {model_name} isn't supported.")
     
-    def get_encoder(self,
-                    name,
-                    in_channels=1,
-                    out_channels=64,
-                    **kwargs) -> nn.Module:
+    def get_encoder(self, name, **kwargs) -> nn.Module:
+        kwargs = SimpleNamespace(**kwargs)
         if name.lower() == 'gcn_encoder':
-            return GCNEncoder(in_channels=in_channels, out_channels=out_channels)
+            return GCNEncoder(in_channels=kwargs.input_dim, out_channels=kwargs.out_dim)
         elif name.lower() == 'graph_sage':
-            return GraphSAGE(in_channels=in_channels, hidden_dim=out_channels)
+            return GraphSAGE(in_channels=kwargs.input_dim, hidden_dim=kwargs.out_dim)
         elif name.lower() == 'var_gcn_encoder':
-            return VariationalGCNEncoder(in_channels=in_channels, out_channels=out_channels)
+            return VariationalGCNEncoder(in_channels=kwargs.input_dim, out_channels=kwargs.out_dim)
         else:
             raise NameError(f"The encoder {name} isn't supported.")
         
-    def get_decoder(self,
-                    name,
-                    input_dim=8,
-                    hidden_dim=128,
-                    **kwargs) -> nn.Module:
+    def get_decoder(self, name, **kwargs) -> nn.Module:
+        kwargs = SimpleNamespace(**kwargs)
+
         if name == 'simple_linear_decoder':
-            return SimpleLinearDecoder(input_dim=input_dim,
-                                       hidden_dim=hidden_dim)
+            return SimpleLinearDecoder(input_dim=kwargs.input_dim,
+                                       hidden_dim=kwargs.hidden_dim)
+        elif name == 'gat_decoder':
+            
+            return GATDecoder(in_dim=kwargs.input_dim,
+                              num_hidden=kwargs.hidden_dim,
+                              out_dim=kwargs.out_dim,
+                              num_layers=kwargs.num_layers,
+                              nhead_out=kwargs.nhead_out,
+                              negative_slope=kwargs.negative_slope,
+                              concat_out=kwargs.concat_out)
             
         return None # default to the InnerProduct              
     
     
-    def init_autoencoders(self,
-                          autoencoder_name: str,
-                          enc_name: str,
-                          dec_name: str,
-                          in_channels: int = 8,
-                          out_channels: int = 64,
-                          num_classes: int=2,
-                          separation_margin=1) -> List[nn.Module]:
-        
+    def init_autoencoders(self, autoencoder_name: str, encoder: nn.Module, decoder: nn.Module,
+                          num_classes: int = 2, **kwargs) -> List[nn.Module]:
         return [
             self.get_model(model_name=autoencoder_name,
-                           encoder=self.get_encoder(name=enc_name,
-                                                    in_channels=in_channels,
-                                                    out_channels=out_channels),
-                           decoder=self.get_decoder(name=dec_name,
-                                                    input_dim=in_channels,
-                                                    hidden_dim=out_channels),
-                           margin=separation_margin)\
-                               .double().to(self.device)\
-                                   for _ in range(num_classes)
+                           encoder=encoder,
+                           decoder=decoder,
+                           **kwargs).double().to(self.device)for _ in range(num_classes)
         ]
     
 class SiameseFactory:
