@@ -73,8 +73,10 @@ class GATDecoder(nn.Module, Decoder):
     def forward(self, x, edge_index, edge_attr, return_hidden=False):
         hidden_list = []
         for l in range(self.num_layers):
-            x = self.gat_layers[l](x, edge_index, edge_attr, return_attention_weights=False)
+            x, _ = self.gat_layers[l](x, edge_index, edge_attr, return_attention_weights=True)
             hidden_list.append(x)
+            
+        print(x)
             
         return self.head(x), hidden_list if return_hidden else self.head(x)
         
