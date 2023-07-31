@@ -402,7 +402,7 @@ class ExplainerFactory:
             epochs_ae = explainer_parameters.get('epochs_ae', 100)
             top_k_cf = explainer_parameters.get('top_k_cf', 10)
             in_dim = explainer_parameters.get('in_dim', 4)
-            decoder_dims = explainer_parameters.get('decoder_dims', 3)
+            decoder_dims = explainer_parameters.get('decoder_dims', in_dim)
             replace_rate = explainer_parameters.get('replace_rate', .1)
             mask_rate = explainer_parameters.get('mask_rate', .3)           
             
@@ -416,7 +416,8 @@ class ExplainerFactory:
                                                                            'in_dim': in_dim,
                                                                            'decoder_dims': decoder_dims,
                                                                            'replace_rate': replace_rate,
-                                                                           'mask_rate': mask_rate
+                                                                           'mask_rate': mask_rate,
+                                                                           "decoder_dims": decoder_dims
                                                                        })
             
             schedulers = tuple([self._weight_scheduler_factory.get_scheduler_by_name(weight_dict) for weight_dict in schedulers])
