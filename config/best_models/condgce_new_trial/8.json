@@ -12,7 +12,7 @@
             "parameters": {
                 "begin_time": 2000,
                 "end_time": 2003,
-                "num_instances_per_snapshot": 50,
+                "num_instances_per_snapshot": 10000,
                 "n_nodes": 28,
                 "nodes_in_cycle": 7
             } 
@@ -36,13 +36,13 @@
             "name": "condgce",
             "parameters": { 
                 "epochs_ae": 200,
-                "fold_id": 0,
+                "fold_id": 8,
                 "lr": 1e-4,
                 "top_k_cf": 50,
                 "batch_size": 64,
                 "kl_weight": 0.5,
                 "in_dim": 4,
-                "decoder_dims": 3,
+                "decoder_dims": 2,
                 "replace_rate": 0.1,
                 "mask_rate": 0.3,
                 "encoder": {
@@ -59,10 +59,9 @@
                         "hidden_dim": 3,
                         "out_dim": 4,
                         "num_layers": 2,
-                        "nhead": 2,
-                        "nhead_out": 3,
-                        "negative_slope": 0.2,
-                        "concat_out": true
+                        "nhead": 16,
+                        "nhead_out": 1,
+                        "negative_slope": 0.2                    
                     }
                 },
                 "weight_schedulers": [
