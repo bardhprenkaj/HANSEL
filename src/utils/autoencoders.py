@@ -105,7 +105,7 @@ class CustomVGAE(VGAE, AutoEncoder):
         repr = self.encoder_to_decoder(z)
         repr[mask_nodes] = 0
         # get the reconstructed edge probabilities
-        recon = self.decoder.decode(repr, edge_index, sigmoid=sigmoid)
+        recon = self.decoder.decode(repr, edge_index, **{"edge_attr":edge_attr, "sigmoid":sigmoid})
         return recon, z
         
         
