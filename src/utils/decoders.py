@@ -26,6 +26,7 @@ class GATDecoder(nn.Module, Decoder):
                  concat_out=False):
         
         super().__init__()
+        self.in_dim = in_dim
         self.out_dim = out_dim
         self.num_heads = nhead
         self.num_layers = num_layers

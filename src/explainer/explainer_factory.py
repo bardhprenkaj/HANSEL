@@ -402,16 +402,13 @@ class ExplainerFactory:
             epochs_ae = explainer_parameters.get('epochs_ae', 100)
             top_k_cf = explainer_parameters.get('top_k_cf', 10)
             in_dim = explainer_parameters.get('in_dim', 4)
-            decoder_dims = explainer_parameters.get('decoder_dims', in_dim)
             replace_rate = explainer_parameters.get('replace_rate', .1)
             mask_rate = explainer_parameters.get('mask_rate', .3)
-            
-            print(f'decoder_dims = {decoder_dims}')           
-            
+                        
             encoder = self._autoencoder_factory.get_encoder(encoder_name, **encoder_params)
             decoder = self._autoencoder_factory.get_decoder(decoder_name, **decoder_params)
             
-            kwargs = {'in_dim': in_dim, 'decoder_dims': decoder_dims, 'replace_rate': replace_rate, 'mask_rate': mask_rate}
+            kwargs = {'in_dim': in_dim, 'decoder_dims': decoder.in_dim, 'replace_rate': replace_rate, 'mask_rate': mask_rate}
             
             autoencoders = self._autoencoder_factory.init_autoencoders('vgae', encoder, decoder, num_classes, **kwargs)
             
