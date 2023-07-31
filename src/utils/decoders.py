@@ -74,15 +74,12 @@ class GATDecoder(nn.Module, Decoder):
         hidden_list = []
         for l in range(self.num_layers):
             x, _ = self.gat_layers[l](x, edge_index, edge_attr, return_attention_weights=True)
-            hidden_list.append(x)
-            
-        print(x)
-            
+            hidden_list.append(x)            
         return self.head(x), hidden_list if return_hidden else self.head(x)
         
     
     def decode(self, z, pos_edge_index, **kwargs):
-        recon = self.forward(z, pos_edge_index, kwargs['edge_attr'])
+        recon = self.forward(z, pos_edge_index, kwargs['edge_attr'], return_hidden=False)
         recon_edges = torch.matmul(recon, recon.t())
         return torch.sigmoid(recon_edges) if kwargs['sigmoid'] else recon_edges
         
