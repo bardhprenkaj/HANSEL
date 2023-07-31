@@ -229,12 +229,12 @@ class ConDGCE(Explainer):
                 
                 self.optimizers[cls].zero_grad()
                 # get the latent embedesentation of the graph
-                z = self.autoencoders[cls].encode(x, edge_indices, edge_attrs)
+                edge_probabilities, z = self.autoencoders[cls](x, edge_indices, edge_attrs)
 
                 # rebuild the ground truth
-                #gt = self.__rebuild_adj_matrix(len(x), edge_indices, edge_attrs)
+                gt = self.__rebuild_adj_matrix(len(x), edge_indices, edge_attrs)
                 # get the reconstruction loss
-                rec_loss = self.autoencoders[cls].loss(z, edge_indices)
+                rec_loss = self.autoencoders[cls].loss(edge_probabilities, gt)
                 # make the latent embedesentation be centred
                 dist_loss = torch.linalg.vector_norm(z, ord=2)
         

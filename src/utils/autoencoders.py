@@ -46,6 +46,8 @@ class CustomVGAE(VGAE, AutoEncoder):
         self.encoder_to_decoder = nn.Linear(self.decoder_dims, self.decoder_dims, bias=False)
         self.enc_mask_token = nn.Parameter(torch.zeros(1, self.in_dim))
         
+        self.mse = nn.MSELoss()
+        
     def recon_loss(self, z: Tensor, pos_edge_index: Tensor,
                    neg_edge_index: Optional[Tensor] = None) -> Tensor:
         num_nodes = len(z)
@@ -62,7 +64,7 @@ class CustomVGAE(VGAE, AutoEncoder):
         return pos_loss + neg_loss
  
     def loss(self, z: Tensor, truth):   
-        return self.recon_loss(z, pos_edge_index=truth) + (1/z.shape[0]) * self.kl_loss()
+        return self.mse(z, truth) + (1/z.shape[0]) * self.kl_loss()
     
     def encoding_mask_noise(self, x, mask_rate=.3):
         num_nodes = x.shape[0]
@@ -94,20 +96,16 @@ class CustomVGAE(VGAE, AutoEncoder):
         return x, mask_nodes, keep_nodes
         
     
-    def forward(self, x, edge_index, edge_attr):
+    def forward(self, x, edge_index, edge_attr, sigmoid=True):
         use_x, mask_nodes, _ = self.encoding_mask_noise(x, self.mask_rate)
         # encode the x
         z = self.encode(use_x, edge_index, edge_attr)
         # align the encoder latent space with the decoder's input space
         repr = self.encoder_to_decoder(z)
         repr[mask_nodes] = 0
-        
-        recon = self.decoder(repr, edge_index, edge_attr)
-        
-        x_init = x[mask_nodes]
-        x_rec = recon[mask_nodes]
-        
-        return x_init, x_rec
+        # get the reconstructed edge probabilities
+        recon = self.decoder.decode(repr, edge_index, sigmoid=sigmoid)
+        return recon, z
         
         
 class ContrastiveGAE(GAE, AutoEncoder):
