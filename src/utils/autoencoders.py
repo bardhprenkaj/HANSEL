@@ -43,6 +43,7 @@ class CustomVGAE(VGAE, AutoEncoder):
         self.replace_rate = kwargs.get('replace_rate', .1)
         self.mask_rate = kwargs.get('mask_rate', .3)
         
+        print(f'decoder_dims inside the VGAE = {self.decoder_dims}')
         self.encoder_to_decoder = nn.Linear(self.decoder_dims, self.decoder_dims, bias=False)
         self.enc_mask_token = nn.Parameter(torch.zeros(1, self.in_dim))
         

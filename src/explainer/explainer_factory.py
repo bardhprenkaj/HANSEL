@@ -404,7 +404,9 @@ class ExplainerFactory:
             in_dim = explainer_parameters.get('in_dim', 4)
             decoder_dims = explainer_parameters.get('decoder_dims', in_dim)
             replace_rate = explainer_parameters.get('replace_rate', .1)
-            mask_rate = explainer_parameters.get('mask_rate', .3)           
+            mask_rate = explainer_parameters.get('mask_rate', .3)
+            
+            print(f'decoder_dims = {decoder_dims}')           
             
             encoder = self._autoencoder_factory.get_encoder(encoder_name, **encoder_params)
             decoder = self._autoencoder_factory.get_decoder(decoder_name, **decoder_params)
@@ -417,7 +419,6 @@ class ExplainerFactory:
                                                                            'decoder_dims': decoder_dims,
                                                                            'replace_rate': replace_rate,
                                                                            'mask_rate': mask_rate,
-                                                                           "decoder_dims": decoder_dims
                                                                        })
             
             schedulers = tuple([self._weight_scheduler_factory.get_scheduler_by_name(weight_dict) for weight_dict in schedulers])
