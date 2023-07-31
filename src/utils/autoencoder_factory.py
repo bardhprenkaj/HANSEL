@@ -24,11 +24,11 @@ class AEFactory:
                   **kwargs) -> nn.Module:
         
         if model_name.lower() == 'vgae':
-            return CustomVGAE(encoder=encoder, decoder=decoder, **kwargs)        
+            return CustomVGAE(encoder, decoder, **kwargs)        
         if model_name.lower() == 'gae':
-            return CustomGAE(encoder=encoder, decoder=decoder)
+            return CustomGAE(encoder, decoder)
         if model_name.lower() == 'contrastive_gae':
-            return ContrastiveGAE(encoder=encoder, decoder=decoder, **kwargs)
+            return ContrastiveGAE(encoder, decoder, **kwargs)
         else:
             raise NameError(f"The model name {model_name} isn't supported.")
     
