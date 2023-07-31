@@ -58,7 +58,7 @@ class GATDecoder(nn.Module, Decoder):
                     add_self_loops=False
                 ))
             # output projection
-            self.get_layers.append(GATConv(
+            self.gat_layers.append(GATConv(
                 in_channels=num_hidden * nhead,
                 out_channels=out_dim,
                 heads=nhead_out,
