@@ -57,7 +57,8 @@ class AEFactory:
                               num_layers=kwargs.num_layers,
                               nhead_out=kwargs.nhead_out,
                               negative_slope=kwargs.negative_slope,
-                              concat_out=kwargs.concat_out)
+                              concat_out=kwargs.concat_out,
+                              nhead=kwargs.nhead)
             
         return None # default to the InnerProduct              
     
