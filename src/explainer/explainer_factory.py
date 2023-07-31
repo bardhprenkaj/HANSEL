@@ -411,10 +411,8 @@ class ExplainerFactory:
             encoder = self._autoencoder_factory.get_encoder(encoder_name, **encoder_params)
             decoder = self._autoencoder_factory.get_decoder(decoder_name, **decoder_params)
             
-            autoencoders = self._autoencoder_factory.init_autoencoders(autoencoder_name='vgae',
-                                                                       encoder=encoder,
-                                                                       decoder=decoder,
-                                                                       kwargs={
+            autoencoders = self._autoencoder_factory.init_autoencoders('vgae', encoder, decoder, num_classes,
+                                                                       {
                                                                            'in_dim': in_dim,
                                                                            'decoder_dims': decoder_dims,
                                                                            'replace_rate': replace_rate,
