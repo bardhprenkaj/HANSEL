@@ -34,18 +34,17 @@ class CustomVGAE(VGAE, AutoEncoder):
     
     def __init__(self, encoder: nn.Module,
                  decoder: Optional[nn.Module] = None,
-                 in_dim: int = 4,
-                 decoder_dims: int = 10,
-                 replace_rate: float = .1,
-                 mask_rate: float= .3):
+                 **kwargs):
         
         super().__init__(encoder, decoder)
         
-        self.replace_rate = replace_rate
-        self.mask_rate = mask_rate
+        self.in_dim = kwargs.get('in_dim', 4)
+        self.decoder_dims = kwargs.get('decoder_dims', 10)
+        self.replace_rate = kwargs.get('replace_rate', .1)
+        self.mask_rate = kwargs.get('mask_rate', .3)
         
-        self.encoder_to_decoder = nn.Linear(decoder_dims, decoder_dims, bias=False)
-        self.enc_mask_token = nn.Parameter(torch.zeros(1, in_dim))
+        self.encoder_to_decoder = nn.Linear(self.decoder_dims, self.decoder_dims, bias=False)
+        self.enc_mask_token = nn.Parameter(torch.zeros(1, self.in_dim))
         
     def recon_loss(self, z: Tensor, pos_edge_index: Tensor,
                    neg_edge_index: Optional[Tensor] = None) -> Tensor:
@@ -113,10 +112,10 @@ class CustomVGAE(VGAE, AutoEncoder):
         
 class ContrastiveGAE(GAE, AutoEncoder):
     
-    def __init__(self, encoder: nn.Module, decoder: Optional[nn.Module] = None, margin: Optional[float] = 1):
+    def __init__(self, encoder: nn.Module, decoder: Optional[nn.Module] = None, **kwargs):
         super().__init__(encoder, decoder)
-        
-        self.contrastive_loss = SupervisedContrastiveLoss(margin=margin)
+        self.margin = kwargs.get('margin', 2)
+        self.contrastive_loss = SupervisedContrastiveLoss(margin=self.margin)
         self.mse = nn.MSELoss()
         
     def loss(self, z, truth):
