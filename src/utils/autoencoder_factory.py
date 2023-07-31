@@ -64,7 +64,7 @@ class AEFactory:
     
     
     def init_autoencoders(self, autoencoder_name: str, encoder: nn.Module, decoder: nn.Module,
-                          num_classes: int = 2, **kwargs) -> List[nn.Module]:
+                          num_classes: int, **kwargs) -> List[nn.Module]:
         return [
             self.get_model(model_name=autoencoder_name,
                            encoder=encoder,

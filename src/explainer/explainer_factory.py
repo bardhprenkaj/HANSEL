@@ -411,13 +411,9 @@ class ExplainerFactory:
             encoder = self._autoencoder_factory.get_encoder(encoder_name, **encoder_params)
             decoder = self._autoencoder_factory.get_decoder(decoder_name, **decoder_params)
             
-            autoencoders = self._autoencoder_factory.init_autoencoders('vgae', encoder, decoder, num_classes,
-                                                                       {
-                                                                           'in_dim': in_dim,
-                                                                           'decoder_dims': decoder_dims,
-                                                                           'replace_rate': replace_rate,
-                                                                           'mask_rate': mask_rate,
-                                                                       })
+            kwargs = {'in_dim': in_dim, 'decoder_dims': decoder_dims, 'replace_rate': replace_rate, 'mask_rate': mask_rate}
+            
+            autoencoders = self._autoencoder_factory.init_autoencoders('vgae', encoder, decoder, num_classes, **kwargs)
             
             schedulers = tuple([self._weight_scheduler_factory.get_scheduler_by_name(weight_dict) for weight_dict in schedulers])
             alpha_scheduler, beta_scheduler = schedulers
