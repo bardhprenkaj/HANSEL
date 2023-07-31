@@ -36,7 +36,7 @@
             "name": "condgce",
             "parameters": { 
                 "epochs_ae": 200,
-                "fold_id": 1,
+                "fold_id": 6,
                 "lr": 1e-4,
                 "top_k_cf": 50,
                 "batch_size": 64,
