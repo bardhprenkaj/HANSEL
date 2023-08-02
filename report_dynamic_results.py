@@ -37,25 +37,27 @@ if __name__ == '__main__':
                     for i in range(1, k+1):
                         for metric in metrics:
                             curr_metric = reports.get(f'{metric._name}@{i}', [])
-                            for elem in curr_metric:
-                                if type(elem) == list:
-                                    report[group[0]][f'{metric._name}@{i}'] += elem
-                                else:
-                                    report[group[0]][f'{metric._name}@{i}'].append(elem)
+                            if f'{metric._name}'.lower() in ['graph_edit_distance', 'sparsity']:
+                                curr_metric = np.mean(curr_metric, axis=1).tolist()
+                            if type(curr_metric) == list:
+                                report[group[0]][f'{metric._name}@{i}'].append(curr_metric)
+                            else:
+                                report[group[0]][f'{metric._name}@{i}'].append([float(curr_metric)] * len(report[group[0]][f'{metric._name}@{i}']))
+                            
                     runtime = reports.get('runtime', [])
-                    for elem in runtime:
-                        if type(elem) == list:
-                            report[group[0]]['runtime'] += elem
-                        else:
-                            report[group[0]]['runtime'].append(float(elem))
+                    if type(runtime) == list:
+                        report[group[0]]['runtime'].append(runtime)
+                    else:
+                        report[group[0]]['runtime'].append([float(runtime)] * len(report[group[0]]['runtime']))
         
         for year in report.keys():
             for metric in report[year]:
-                report[year][metric] = f'{np.mean(report[year][metric]):.2f}^'+"{"+f'\\pm {np.std(report[year][metric]):.3f}'+"}"
-                
+                report[year][metric] = np.mean(report[year][metric], axis=0)
+                report[year][metric] = f'{np.mean(report[year][metric]):.2f}\\pm {np.std(report[year][metric]):.3f}'
+             
             if type(report[year]['runtime']) != str:
                 report[year]['runtime'] = np.array(report[year]['runtime']).astype(np.float64)
                 report[year]['runtime'] = f'{np.mean(report[year]["runtime"]):.2f}^'+"{"+f'\\pm {np.std(report[year]["runtime"]):.3f}'+"}"
-            
+        
         with open('yearly_metric_reports.json', 'w') as f:
             json.dump(report, f)
