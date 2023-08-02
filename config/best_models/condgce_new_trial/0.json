@@ -12,7 +12,7 @@
             "parameters": {
                 "begin_time": 2000,
                 "end_time": 2003,
-                "num_instances_per_snapshot": 10000,
+                "num_instances_per_snapshot": 2000,
                 "n_nodes": 28,
                 "nodes_in_cycle": 7
             } 

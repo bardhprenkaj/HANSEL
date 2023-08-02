@@ -1,11 +1,9 @@
 #!/bin/bash
 
-search_dir=./config/steel/i-rand-tc48
+search_dir=./config/best_models/condgce_new_trial
 
-for i in {1..10}
+for entry in "$search_dir"/*
 do
-    for entry in "$search_dir"/*
-    do
-        qsub launch.sh main.py $entry $i
-    done
+	echo $entry
+        qsub launch.sh run.py $entry 1
 done
