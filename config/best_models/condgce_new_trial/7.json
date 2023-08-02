@@ -37,7 +37,7 @@
             "parameters": { 
                 "epochs_ae": 200,
                 "fold_id": 7,
-                "lr": 1e-4,
+                "lr": 1e-3,
                 "top_k_cf": 50,
                 "batch_size": 64,
                 "kl_weight": 0.5,

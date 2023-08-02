@@ -55,7 +55,6 @@ class ConDGCE(Explainer):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.wandb_optimize = wandb_optimize
         
-       
         self.prior_y_prob = {str(cls) : 0 for cls in range(len(self.autoencoders))}
         self.next_iteration_classifications = list()
 
@@ -156,8 +155,21 @@ class ConDGCE(Explainer):
         # create dataset of negative pairs
         negative_dataset = TorchGeometricDataset(separated_data[1])
         # data loader with batches
-        return DataLoader(positive_dataset, batch_size=self.batch_size, drop_last=False, shuffle=True),\
-            DataLoader(negative_dataset, batch_size=self.batch_size, drop_last=False, shuffle=True)
+        # in the next iterations it might happen that
+        # there are no positive or negative samples
+        # so we need to catch the errors
+        try:
+            pos_data_loader = DataLoader(positive_dataset, batch_size=self.batch_size, drop_last=False, shuffle=True)
+        except ValueError: # num_samples = 0
+            pos_data_loader = None
+            
+        try:
+            neg_data_loader = DataLoader(negative_dataset, batch_size=self.batch_size, drop_last=False, shuffle=True)
+        except ValueError: # num_samples = 0
+            neg_data_loader = 0
+            
+        return pos_data_loader, neg_data_loader
+            
     
     @torch.no_grad()
     def generative_classification(self, anchor: DataInstance) -> int:
@@ -206,47 +218,48 @@ class ConDGCE(Explainer):
         
         
     def __train(self, cls, data_loader: DataLoader, epochs: int):
-        feature_rec_losses = {epoch: [] for epoch in range(epochs)}
-        mse_loss = torch.nn.MSELoss()
-        for epoch in range(epochs):
-            # loop through the batches
-            feature_rec_losses = []
-            dist_losses = [] 
-            mse_losses = []
-            for batch in data_loader:
-                x = batch.x.to(self.device)
-                edge_indices = batch.edge_index.to(self.device)
-                edge_attrs = batch.edge_attr.to(self.device)
-                                
-                self.optimizers[cls].zero_grad()
-                # get the latent representation of the graph
-                _, z = self.autoencoders[cls](x, edge_indices, edge_attrs)
-                adj_hat = self.autoencoders[cls].decoder.forward_all(z, **{'edge_index': edge_indices, 'edge_attr': edge_attrs, 'sigmoid': True})
-                # rebuild the ground truth
-                gt = self.__rebuild_adj_matrix(len(x), edge_indices, edge_attrs)
-                # get the feature reconstruction loss
-                feature_rec_loss = self.autoencoders[cls].loss(z, edge_indices, edge_attr=edge_attrs)
-                # get the edge reconstruction loss
-                edge_rec_loss = mse_loss(adj_hat, gt)
-                # make the latent representation be centred
-                dist_loss = torch.linalg.vector_norm(z, ord=2)
-        
-                # minimize both losses
-                loss = feature_rec_loss + dist_loss + edge_rec_loss
-                loss.backward()
-                self.optimizers[cls].step()
-                
-                mse_losses.append(edge_rec_loss.item())
-                feature_rec_losses.append(feature_rec_loss.item())
-                dist_losses.append(dist_loss.item())
+        if data_loader: # if there are any samples in this data loader
+            feature_rec_losses = {epoch: [] for epoch in range(epochs)}
+            mse_loss = torch.nn.MSELoss()
+            for epoch in range(epochs):
+                # loop through the batches
+                feature_rec_losses = []
+                dist_losses = [] 
+                mse_losses = []
+                for batch in data_loader:
+                    x = batch.x.to(self.device)
+                    edge_indices = batch.edge_index.to(self.device)
+                    edge_attrs = batch.edge_attr.to(self.device)
+                                    
+                    self.optimizers[cls].zero_grad()
+                    # get the latent representation of the graph
+                    _, z = self.autoencoders[cls](x, edge_indices, edge_attrs)
+                    adj_hat = self.autoencoders[cls].decoder.forward_all(z, **{'edge_index': edge_indices, 'edge_attr': edge_attrs, 'sigmoid': True})
+                    # rebuild the ground truth
+                    gt = self.__rebuild_adj_matrix(len(x), edge_indices, edge_attrs)
+                    # get the feature reconstruction loss
+                    feature_rec_loss = self.autoencoders[cls].loss(z, edge_indices, edge_attr=edge_attrs)
+                    # get the edge reconstruction loss
+                    edge_rec_loss = mse_loss(adj_hat, gt)
+                    # make the latent representation be centred
+                    dist_loss = torch.linalg.vector_norm(z, ord=2)
+            
+                    # minimize both losses
+                    loss = feature_rec_loss + dist_loss + edge_rec_loss
+                    loss.backward()
+                    self.optimizers[cls].step()
+                    
+                    mse_losses.append(edge_rec_loss.item())
+                    feature_rec_losses.append(feature_rec_loss.item())
+                    dist_losses.append(dist_loss.item())
 
-            print(f'Class {cls}, Epoch = {epoch} ----> Feature rec loss = {np.mean(feature_rec_losses): .4f}, Dist loss = {np.mean(dist_losses)}, Edge rec loss = {np.mean(mse_losses)}')
-            """if self.wandb_optimize:
-                wandb.log({
-                    f'feature_rec_loss_{cls}_{self.fold_id}': np.mean(feature_rec_losses[epoch]),
-                    f'contrastive_loss_{cls}_{self.fold_id}': np.mean(contrastive_losses),
-                    f'epoch_{cls}_{self.fold_id}': epoch,
-                })"""    
+                print(f'Class {cls}, Epoch = {epoch} ----> Feature rec loss = {np.mean(feature_rec_losses): .4f}, Dist loss = {np.mean(dist_losses)}, Edge rec loss = {np.mean(mse_losses)}')
+                """if self.wandb_optimize:
+                    wandb.log({
+                        f'feature_rec_loss_{cls}_{self.fold_id}': np.mean(feature_rec_losses[epoch]),
+                        f'contrastive_loss_{cls}_{self.fold_id}': np.mean(contrastive_losses),
+                        f'epoch_{cls}_{self.fold_id}': epoch,
+                    })"""    
     
     def save_autoencoder(self, model: torch.nn.Module, cls: int):
         """
