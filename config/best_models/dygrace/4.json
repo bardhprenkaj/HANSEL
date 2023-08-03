@@ -38,7 +38,7 @@
                 "input_dim": 8,
                 "out_dim": 4,
                 "epochs_ae": 20,
-                "fold_id": 0,
+                "fold_id": 4,
                 "lr": 1e-3,
                 "autoencoder_name": "gae",
                 "encoder_name": "gcn_encoder"

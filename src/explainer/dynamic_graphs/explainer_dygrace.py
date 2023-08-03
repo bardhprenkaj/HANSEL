@@ -10,7 +10,7 @@ import pandas as pd
 import torch
 from sklearn.linear_model import LogisticRegression
 from torch_geometric.data import Data
-from torch_geometric.loader import DataLoader as GeometricDataLoader
+from torch_geometric.loader import DataLoader
 
 from src.dataset.data_instance_base import DataInstance
 from src.dataset.dataset_base import Dataset
@@ -18,7 +18,6 @@ from src.dataset.torch_geometric.dataset_geometric import TorchGeometricDataset
 from src.evaluation.evaluation_metric_ged import GraphEditDistanceMetric
 from src.explainer.explainer_base import Explainer
 from src.oracle.oracle_base import Oracle
-from src.utils.autoencoder_factory import AEFactory
 
 
 class DyGRACE(Explainer):
@@ -26,17 +25,12 @@ class DyGRACE(Explainer):
     def __init__(self,
                  id,
                  explainer_store_path,
+                 autoencoders,
                  num_classes=2,
-                 in_channels=1,
-                 out_channels=4,
                  fold_id=0,
                  batch_size=24,
                  lr=1e-4,
                  epochs_ae=100,
-                 device='cpu',
-                 enc_name='gcn_encoder',
-                 dec_name=None,
-                 autoencoder_name='gae',
                  top_k_cf=5,
                  config_dict=None,
                  **kwargs) -> None:
@@ -47,35 +41,16 @@ class DyGRACE(Explainer):
         self.fold_id = fold_id
         self.batch_size = batch_size
         self.epochs_ae = epochs_ae
-        self.device = device
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.lr = lr
-        
         self.iteration = 0
-        
-        self.ae_factory = AEFactory()
-        
-        self.autoencoders = [
-            self.ae_factory.get_model(model_name=autoencoder_name,
-                                      encoder=self.ae_factory.get_encoder(name=enc_name,
-                                                                          in_channels=in_channels,
-                                                                          out_channels=out_channels),
-                                      decoder=self.ae_factory.get_decoder(name=dec_name,
-                                                                          in_channels=in_channels,
-                                                                          out_channels=out_channels))\
-                                                                              .double().to(self.device)\
-                                                                                  for _ in range(num_classes)
-        ]
-        
+        self.autoencoders = autoencoders
         self.contrastive_learner = LogisticRegression()        
-        
         self.explainer_store_path = explainer_store_path
-        
         self.EPS = 20
-        
         self.K = top_k_cf
 
-        
-        
+
     def explain(self, instance, oracle: Oracle, dataset: Dataset):
         explainer_name = f'{self.__class__.__name__}_fit_on_{dataset.name}_fold_id_{self.fold_id}'
         self.explainer_uri = os.path.join(self.explainer_store_path, explainer_name)
@@ -194,10 +169,10 @@ class DyGRACE(Explainer):
         factual_label = np.argmin(rec_errors)
         # transform the list of counterafactuals in a torch geometric data loader
         counterfactuals_geometric = [self.__to_geometric(counterfactual, label=torch.Tensor([-1])) for counterfactual in counterfactuals]
-        cf_data_loader = GeometricDataLoader(TorchGeometricDataset(counterfactuals_geometric), batch_size=1, shuffle=True, num_workers=2)
+        cf_data_loader = DataLoader(TorchGeometricDataset(counterfactuals_geometric, transform=False), batch_size=1, shuffle=True, num_workers=2)
         # transform the list of factuals in a torch geometric data loader
         factuals_geometric = [self.__to_geometric(factual, label=torch.Tensor([-1])) for factual in factuals]
-        f_data_loader = GeometricDataLoader(TorchGeometricDataset(factuals_geometric), batch_size=1, shuffle=True, num_workers=2)
+        f_data_loader = DataLoader(TorchGeometricDataset(factuals_geometric, transform=False), batch_size=1, shuffle=True, num_workers=2)
         # set the labels to the instance and counterfactuals
         # in a semi-supervised fashion via the learned autoencoders
         instance.graph_label = factual_label
@@ -253,7 +228,7 @@ class DyGRACE(Explainer):
         return X, y
     
     
-    def __inference_table(self, data_loader: GeometricDataLoader, dataset: Dataset,
+    def __inference_table(self, data_loader: DataLoader, dataset: Dataset,
                           search_for_instance: DataInstance):
         
         rows = {'rec_cf': [], 'rec_f': [], 'sim': [], 'instance': []}
@@ -289,7 +264,7 @@ class DyGRACE(Explainer):
             
         return rows
         
-    def __training_table(self, data_loader: GeometricDataLoader, dataset: Dataset, oracle: Oracle, cls=1, use_oracle=True):
+    def __training_table(self, data_loader: DataLoader, dataset: Dataset, oracle: Oracle, cls=1, use_oracle=True):
         rows = []
         
         with torch.no_grad():
@@ -332,7 +307,7 @@ class DyGRACE(Explainer):
                 
         return rows
             
-    def transform_data(self, oracle: Oracle, dataset: Dataset, index_label=False, use_oracle=True) -> List[GeometricDataLoader]:
+    def transform_data(self, oracle: Oracle, dataset: Dataset, index_label=False, use_oracle=True) -> List[DataLoader]:
         indices = dataset.get_split_indices()[self.fold_id]['train']        
 
         data_dict_cls = {cls:[] for cls in dataset.get_classes()}
@@ -345,15 +320,15 @@ class DyGRACE(Explainer):
             
         data_loaders = []
         for cls in data_dict_cls.keys():
-            data_loaders.append(GeometricDataLoader(
-                TorchGeometricDataset(data_dict_cls[cls]),
+            data_loaders.append(DataLoader(
+                TorchGeometricDataset(data_dict_cls[cls], transform=False),
                                       batch_size=1,
                                       num_workers=2)
             )
         
         return data_loaders
     
-    def __contrastive_learning(self, oracle: Oracle, dataset: Dataset, indices: np.array, use_oracle=True) -> Tuple[GeometricDataLoader, GeometricDataLoader]:
+    def __contrastive_learning(self, oracle: Oracle, dataset: Dataset, indices: np.array, use_oracle=True) -> Tuple[DataLoader, DataLoader]:
         # get only the training data to avoid going out of bounds
         data = {}
         split_indices = {label: [] for label in range(self.num_classes)}
@@ -397,12 +372,12 @@ class DyGRACE(Explainer):
             if negative_index[0] in data and negative_index[1] in data:
                 negatives.append(list(itemgetter(*negative_index)(data)))
                     
-        pos_data_loader = GeometricDataLoader(TorchGeometricDataset(positives),
+        pos_data_loader = DataLoader(TorchGeometricDataset(positives, transform=False),
                                       batch_size=1,
                                       shuffle=True,
                                       num_workers=2)
         
-        neg_data_loader = GeometricDataLoader(TorchGeometricDataset(negatives),
+        neg_data_loader = DataLoader(TorchGeometricDataset(negatives, transform=False),
                                                            batch_size=1,
                                                            shuffle=True,
                                                            num_workers=2)
@@ -447,7 +422,7 @@ class DyGRACE(Explainer):
         return permutations_list
     
     
-    def __train(self, data_loader: GeometricDataLoader, cls: int, maximise=False):
+    def __train(self, data_loader: DataLoader, cls: int, maximise=False):
         optimiser = torch.optim.Adam(self.autoencoders[cls].parameters(), lr=self.lr)
             
         for epoch in range(self.epochs_ae):

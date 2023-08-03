@@ -12,7 +12,7 @@
             "parameters": {
                 "begin_time": 2000,
                 "end_time": 2003,
-                "num_instances_per_snapshot": 2000,
+                "num_instances_per_snapshot": 50,
                 "n_nodes": 28,
                 "nodes_in_cycle": 7
             } 
@@ -38,10 +38,15 @@
                 "input_dim": 8,
                 "out_dim": 4,
                 "epochs_ae": 20,
-                "fold_id": 0,
+                "fold_id": 2,
                 "lr": 1e-3,
-                "autoencoder_name": "gae",
-                "encoder_name": "gcn_encoder"
+                "encoder": {
+                    "name": "gcn_encoder",
+                    "parameters": {
+                        "input_dim": 4,
+                        "out_dim": 2
+                    }
+                }
             } 
         }
     ],

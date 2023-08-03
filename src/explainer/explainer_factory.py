@@ -311,22 +311,36 @@ class ExplainerFactory:
             return self.get_ada_gce(fold_id, num_classes, time, in_channels, out_channels, batch_size,
                                     lr, epochs_ae, epochs_siamese, enc_name, dec_name, contrastive_base_model,
                                     config_dict=explainer_dict)
+            
         elif explainer_name == 'dygrace':
+            # encoder parameters
+            encoder = explainer_parameters['encoder']
+            encoder_name = encoder.get('name', 'vgae_')
+            if 'parameters' not in encoder:
+                raise ValueError('''The encoder of DyGRACE needs to have parameters, even if they're empty''')
+            encoder_params = encoder['parameters']
+            
             fold_id = explainer_parameters.get('fold_id', 0)
             num_classes = explainer_parameters.get('num_classes', 2)
-            in_channels = explainer_parameters.get('in_channels', 1)
-            out_channels = explainer_parameters.get('out_channels', 4)
+            in_channels = explainer_parameters.get('input_dim', 1)
+            out_channels = explainer_parameters.get('out_dim', 4)
             batch_size = explainer_parameters.get('batch_size', 24)
             lr = explainer_parameters.get('lr', 1e-3)
             epochs_ae = explainer_parameters.get('epochs_ae', 100)
             top_k_cf = explainer_parameters.get('top_k_cf', 10)
             
-            enc_name = explainer_parameters.get('encoder_name', 'var_gcn_encoder')
-            dec_name = explainer_parameters.get('decoder_name', None)
-            autoencoder_name = explainer_parameters.get('autoencoder_name', 'vgae')
+            encoder = self._autoencoder_factory.get_encoder(encoder_name, **encoder_params)            
+            kwargs = {'in_dim': in_channels, 'out_dim': out_channels}
             
-            return self.get_dygrace(fold_id, num_classes, in_channels, out_channels, batch_size,
-                                    lr, epochs_ae, enc_name, dec_name, autoencoder_name, top_k_cf,
+            autoencoders = self._autoencoder_factory.init_autoencoders('gae', encoder, None, num_classes, **kwargs)
+            
+            return self.get_dygrace(fold_id=fold_id,
+                                    autoencoders=autoencoders,
+                                    num_classes=num_classes,
+                                    batch_size=batch_size,
+                                    lr=lr,
+                                    epochs_ae=epochs_ae,
+                                    top_k_cf=top_k_cf,
                                     config_dict=explainer_dict)
             
         elif explainer_name == 'contrastive_dygrace':
@@ -476,22 +490,22 @@ class ExplainerFactory:
         self._explainer_id_counter += 1
         return result  
     
-    def get_dygrace(self, fold_id, num_classes, in_channels, out_channels, batch_size,
-                    lr, epochs_ae, enc_name, dec_name, autoencoder_name, top_k_cf,
+    def get_dygrace(self, fold_id:int,
+                    autoencoders: List[torch.nn.Module],
+                    num_classes: int,
+                    batch_size: int,
+                    lr: float, epochs_ae: int,
+                    top_k_cf: int,
                     config_dict=None):
         
         result = DyGRACE(id=self._explainer_id_counter,
                      explainer_store_path=self._explainer_store_path,
                      fold_id=fold_id,
+                     autoencoders=autoencoders,
                      num_classes=num_classes,
-                     in_channels=in_channels,
-                     out_channels=out_channels,
                      batch_size=batch_size,
                      lr=lr,
                      epochs_ae=epochs_ae,
-                     enc_name=enc_name,
-                     dec_name=dec_name,
-                     autoencoder_name=autoencoder_name,
                      top_k_cf=top_k_cf,
                      config_dict=config_dict)
         
