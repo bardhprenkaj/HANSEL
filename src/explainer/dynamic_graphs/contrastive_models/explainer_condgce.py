@@ -55,8 +55,11 @@ class ConDGCE(Explainer):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.wandb_optimize = wandb_optimize
         
+       
         self.prior_y_prob = {str(cls) : 0 for cls in range(len(self.autoencoders))}
         self.next_iteration_classifications = list()
+        
+        self.counterfactuals = {cls : [] for cls in range(len(self.autoencoders))}
 
         
     def explain(self, instance, oracle: Oracle, dataset: Dataset):
@@ -68,11 +71,15 @@ class ConDGCE(Explainer):
         self.explainer_uri = os.path.join(self.explainer_store_path, explainer_name)
         self.name = explainer_name
         # train using the oracle only in the first iteration
-        update = (self.iteration != 0)
-        self.fit(oracle, dataset, self.fold_id, update=update)
+        if self.iteration == 0:        
+            self.fit(oracle, dataset, self.fold_id)
+            self.prev_iteration = self.iteration
         ########################################
         # inference
-        counterfactuals = self.inference(instance, dataset)
+        counterfactuals, factual_index = self.inference(instance, dataset)
+        # update the factual autoencoder for the next iterations
+        if self.iteration > 0:
+            self.reflect_changes(instance, counterfactuals, factual_index)
         ########################################
         # save the autoencoders
         # we do the saving here since in the next iterations
@@ -85,20 +92,32 @@ class ConDGCE(Explainer):
         # return the counterfactual list
         return counterfactuals
         
-    def fit(self, oracle: Oracle, dataset: Dataset, fold_id=0, update=False):
+    def fit(self, oracle: Oracle, dataset: Dataset, fold_id=0):
         if os.path.exists(self.explainer_uri):
             # Load the weights of the trained model
             self.load_autoencoders()
         else:
-            self.__fit(oracle, dataset, update=update)
-                   
-    def __fit(self, oracle: Oracle, dataset: Dataset, update: bool = False):
-        data_loaders: Tuple[DataLoader, DataLoader] = self.transform_data(oracle, dataset, update=update)
+            self.__fit(oracle, dataset)
+    
+    def reflect_changes(self, search_instance: DataInstance, counterfactuals: List[DataInstance], factual_index: int = 0):
+        factual_loader = DataLoader(TorchGeometricDataset([search_instance]))
+        cf_loader = DataLoader(TorchGeometricDataset(counterfactuals))
+        data_loaders = (cf_loader, factual_loader) if factual_index else (factual_loader, cf_loader)
+        # save the classification labels
+        self.next_iteration_classifications.append(factual_index)
+        self.next_iteration_classifications += [1-factual_index] * len(counterfactuals)
+        # update both autoencoders
+        for cls in range(len(self.autoencoders)):
+            epochs = max(self.epochs // 10, 1) if cls == factual_index else len(counterfactuals)
+            self.__train(cls, data_loaders[cls], epochs)
+               
+    def __fit(self, oracle: Oracle, dataset: Dataset):
+        data_loaders: Tuple[DataLoader, DataLoader] = self.transform_data(oracle, dataset)
         for cls in range(len(self.autoencoders)):
             self.__train(cls, data_loaders[cls], self.epochs)
                     
     @torch.no_grad()
-    def inference(self, search_instance: DataInstance, dataset: Dataset) -> List[DataInstance]:
+    def inference(self, search_instance: DataInstance, dataset: Dataset):
         # get the instances of this current snapshot
         indices = dataset.get_split_indices()[self.fold_id]['train']
         instances = [dataset.get_instance(i) for i in indices]
@@ -108,7 +127,7 @@ class ConDGCE(Explainer):
         # that we want to find counterfactuals for
         search_graph = TorchGeometricDataset([search_instance]).get(0)
         # predict the class in a generative fashion
-        factual_index = self.generative_classification(search_instance)
+        factual_index = self.generative_classification(search_graph)
         # get the opposite class as the plausible counterfactual one
         cf_index = 1 - factual_index
         # get the autoencoder corresponding to the counterfactuals
@@ -121,30 +140,35 @@ class ConDGCE(Explainer):
         # of the "known world" for this autoencoder
         z_star = self.lam * z
         # get the nearest neighbours
-        cf_indices = self.neighbours(cf_vgae, z_star, new_dataset)
+        cf_indices = self.neighbours(cf_vgae, z_star, new_dataset, cf_index)
         # return the counterfactuals
-        return np.array(instances)[cf_indices].tolist()
-       
+        counterfactuals = np.array(instances)[cf_indices]
+        self.counterfactuals[cf_index].append(counterfactuals.tolist())
+        return counterfactuals, factual_index
+    
     @torch.no_grad()
-    def neighbours(self, autoencoder: torch.nn.Module, latent: Tensor, dataset: TorchGeometricDataset):
-        embeddings = torch.from_numpy(np.array([self.embed(autoencoder, inst).numpy() for inst in dataset.instances]))
+    def neighbours(self, autoencoder: torch.nn.Module, latent: Tensor, dataset: TorchGeometricDataset, cls=0):
+        embeddings = []
+        for inst in dataset.instances:
+            if inst not in self.counterfactuals[1-cls]:
+                embeddings.append(self.embed(autoencoder, inst).numpy())
+        embeddings = torch.from_numpy(np.array(embeddings))
         # calculate the pairwise Euclidean distance between latent and embeddings
         embeddings = embeddings.reshape(embeddings.shape[0], -1)
         latent = latent.reshape(1, -1)
         squared_distance = torch.sum((latent -  embeddings) ** 2, dim=1)
         # Take the square root to get the Euclidean distance
         distance = torch.sqrt(squared_distance)
-        _, top_k_indices = torch.topk(distance, min(self.k, len(distance)), dim=0, largest=False)
+        _, top_k_indices = torch.topk(distance, min(self.k, dataset.len()), dim=0, largest=False)
         return top_k_indices.numpy()
         
-    def transform_data(self, oracle: Oracle, dataset: Dataset, update: bool = False) -> Tuple[DataLoader, DataLoader]:
+    def transform_data(self, oracle: Oracle, dataset: Dataset) -> Tuple[DataLoader, DataLoader]:
         indices = dataset.get_split_indices()[self.fold_id]['train']
         
         separated_data = {cls: [] for cls in range(len(self.autoencoders))}
         for i in indices:
             inst = dataset.get_instance(i)
-            label = oracle.predict(inst) if not update else self.generative_classification(inst)
-            separated_data[label].append(inst)
+            separated_data[oracle.predict(inst)].append(inst)
         # we need this probability of choosing which autoencoder
         # to use at inference time for generating counterfactuals
         for cls in separated_data.keys():
@@ -155,24 +179,11 @@ class ConDGCE(Explainer):
         # create dataset of negative pairs
         negative_dataset = TorchGeometricDataset(separated_data[1])
         # data loader with batches
-        # in the next iterations it might happen that
-        # there are no positive or negative samples
-        # so we need to catch the errors
-        try:
-            pos_data_loader = DataLoader(positive_dataset, batch_size=self.batch_size, drop_last=False, shuffle=True)
-        except ValueError: # num_samples = 0
-            pos_data_loader = None
-            
-        try:
-            neg_data_loader = DataLoader(negative_dataset, batch_size=self.batch_size, drop_last=False, shuffle=True)
-        except ValueError: # num_samples = 0
-            neg_data_loader = 0
-            
-        return pos_data_loader, neg_data_loader
-            
+        return DataLoader(positive_dataset, batch_size=self.batch_size, drop_last=False, shuffle=True),\
+            DataLoader(negative_dataset, batch_size=self.batch_size, drop_last=False, shuffle=True)
     
     @torch.no_grad()
-    def generative_classification(self, anchor: DataInstance) -> int:
+    def generative_classification(self, anchor: Data) -> int:
         """
         Get the index of the anchor autoencoder with the
         minimum reconstruction error for a given anchor data.
@@ -189,25 +200,17 @@ class ConDGCE(Explainer):
             None
         """
         class_choice = []
-        anchor = self.to_geometric(anchor)
         for i, autoencoder in enumerate(self.autoencoders):
             z = self.embed(autoencoder, anchor)
-            feature_rec_loss = autoencoder.loss(z, anchor.edge_index)
+            # get the reconstruction loss
+            rec_loss = autoencoder.loss(z, anchor.edge_index)
             # get the distance loss from the center of the latent space
             dist_loss = torch.linalg.vector_norm(z, ord=2)
-            loss = .5*(feature_rec_loss + dist_loss) - np.log(self.prior_y_prob[str(i)])
+            loss = .5*(rec_loss + dist_loss) - np.log(self.prior_y_prob[str(i)])
             class_choice.append(loss)
 
+        print(class_choice)
         return np.argmin(class_choice)
-    
-    def to_geometric(self, instance: DataInstance, label=0) -> Data:   
-        adj = torch.from_numpy(instance.to_numpy_array()).double()
-        x = torch.from_numpy(instance.features).double()
-
-        a = torch.nonzero(torch.triu(adj))
-        w = adj[a[:,0], a[:,1]]
-        
-        return Data(x=x, y=label, edge_index=a.T, edge_attr=w)
     
     @torch.no_grad()
     def embed(self, autoencoder: torch.nn.Module, data: Data):
@@ -219,8 +222,7 @@ class ConDGCE(Explainer):
         
     def __train(self, cls, data_loader: DataLoader, epochs: int):
         if data_loader: # if there are any samples in this data loader
-            feature_rec_losses = {epoch: [] for epoch in range(epochs)}
-            mse_loss = torch.nn.MSELoss()
+            mse_loss = torch.nn.BCELoss()
             for epoch in range(epochs):
                 # loop through the batches
                 feature_rec_losses = []
@@ -254,12 +256,12 @@ class ConDGCE(Explainer):
                     dist_losses.append(dist_loss.item())
 
                 print(f'Class {cls}, Epoch = {epoch} ----> Feature rec loss = {np.mean(feature_rec_losses): .4f}, Dist loss = {np.mean(dist_losses)}, Edge rec loss = {np.mean(mse_losses)}')
-                """if self.wandb_optimize:
-                    wandb.log({
-                        f'feature_rec_loss_{cls}_{self.fold_id}': np.mean(feature_rec_losses[epoch]),
-                        f'contrastive_loss_{cls}_{self.fold_id}': np.mean(contrastive_losses),
-                        f'epoch_{cls}_{self.fold_id}': epoch,
-                    })"""    
+            """if self.wandb_optimize:
+                wandb.log({
+                    f'rec_loss_{cls}_{self.fold_id}': np.mean(rec_losses[epoch]),
+                    f'contrastive_loss_{cls}_{self.fold_id}': np.mean(contrastive_losses),
+                    f'epoch_{cls}_{self.fold_id}': epoch,
+                })"""    
     
     def save_autoencoder(self, model: torch.nn.Module, cls: int):
         """
@@ -306,6 +308,18 @@ class ConDGCE(Explainer):
         with open(os.path.join(self.explainer_store_path, self.name, 'priors_y.json'), 'r') as f:
             self.prior_y_prob = json.load(f)
             
+        
+    def update(self):
+        print(self.next_iteration_classifications)
+        # update the priors of selecting the autoencoders
+        counts = Counter(self.next_iteration_classifications)
+        all_elems = sum(list(counts.values()))
+        for cls in self.prior_y_prob.keys():
+            self.prior_y_prob[str(cls)] = max(counts[int(cls)] / all_elems, 1e-4)
+        # flush the classifications of the current iteration
+        self.next_iteration_classifications.clear()
+
+
     def __rebuild_adj_matrix(self, num_nodes: int, edge_indices: Tensor, edge_weight: Tensor) -> Tensor:
         truth = torch.zeros(size=(num_nodes, num_nodes)).double()
         truth[edge_indices[0,:], edge_indices[1,:]] = edge_weight
