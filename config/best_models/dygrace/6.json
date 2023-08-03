@@ -35,10 +35,10 @@
         {
             "name": "dygrace",
             "parameters": { 
-                "in_channels": 8,
-                "out_channels": 4,
+                "input_dim": 8,
+                "out_dim": 4,
                 "epochs_ae": 20,
-                "fold_id": 6,
+                "fold_id": 0,
                 "lr": 1e-3,
                 "autoencoder_name": "gae",
                 "encoder_name": "gcn_encoder"
