@@ -36,5 +36,7 @@ class DynamicEvaluator(Evaluator):
             self._explainer.iteration = time - begin_time
             self._data = self.dyn_graph[time]
             super().evaluate()
+            if self._explainer.iteration > 0:
+                self._explainer.update()
             if self.break_on_first:
                 break
