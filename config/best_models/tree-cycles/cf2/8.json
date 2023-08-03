@@ -1,0 +1,57 @@
+{
+    "store_paths": [
+        {"name": "dataset_store_path", "address": "./data/datasets/"},
+        {"name": "embedder_store_path", "address": "./data/embedders/"},
+        {"name": "oracle_store_path", "address": "./data/oracles/"},
+        {"name": "explainer_store_path", "address": "./data/explainers/cf2"},
+        {"name": "output_store_path", "address": "./output/tree-cycles-dynamic"}
+    ],
+    "datasets": [
+        {
+            "name": "dynamic_tree_cycles", 
+            "parameters": {
+                "begin_time": 2000,
+                "end_time": 2003,
+                "num_instances_per_snapshot": 2000,
+                "n_nodes": 28,
+                "nodes_in_cycle": 7
+            } 
+        }
+    ],
+    "oracles": [
+        {
+            "name": "dynamic_oracle",
+            "parameters": {
+                "base_oracle" : {
+                    "name": "tree_cycles_custom_oracle", 
+                    "parameters": {}
+                },
+                "first_train_timestamp": 2000
+            }
+            
+        }
+    ],
+    "explainers": [
+        {
+            "name": "cf2",
+            "parameters": {
+                "n_nodes": 28,
+                "fold_id": 8,
+                "alpha": 0.7,
+                "epochs": 500,
+                "gamma": 0.9,
+                "lam": 20,
+                "lr": 0.01,
+                "batch_size": 0.2
+            }
+        }
+    ],
+    "evaluation_metrics": [ 
+        {"name": "graph_edit_distance", "parameters": {}},
+        {"name": "oracle_calls", "parameters": {}},
+        {"name": "correctness", "parameters": {}},
+        {"name": "sparsity", "parameters": {}},
+        {"name": "fidelity", "parameters": {}},
+        {"name": "oracle_accuracy", "parameters": {}}
+    ]
+}
