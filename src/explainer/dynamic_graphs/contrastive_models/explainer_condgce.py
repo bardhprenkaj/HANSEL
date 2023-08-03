@@ -222,7 +222,7 @@ class ConDGCE(Explainer):
         
     def __train(self, cls, data_loader: DataLoader, epochs: int):
         if data_loader: # if there are any samples in this data loader
-            mse_loss = torch.nn.BCELoss()
+            mse_loss = torch.nn.MSELoss()
             for epoch in range(epochs):
                 # loop through the batches
                 feature_rec_losses = []
