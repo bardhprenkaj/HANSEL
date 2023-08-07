@@ -11,7 +11,6 @@ from torch import Tensor
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 
-import wandb
 from src.dataset.data_instance_base import DataInstance
 from src.dataset.dataset_base import Dataset
 from src.dataset.torch_geometric.dataset_geometric import TorchGeometricDataset

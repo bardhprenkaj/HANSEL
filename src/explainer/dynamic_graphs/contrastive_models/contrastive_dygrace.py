@@ -5,7 +5,6 @@ from typing import List
 
 import numpy as np
 import torch
-import wandb
 from torch import Tensor
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
@@ -290,12 +289,7 @@ class ContrastiveDyGRACE(Explainer):
                 contrastive_losses.append(contrastive_loss.item())
                 
             print(f'Class {cls}, Epoch = {epoch} ----> Rec loss = {np.mean(rec_losses[epoch]): .4f}, Contrastive loss = {np.mean(contrastive_losses): .4f},\t alpha = {alpha: .4f}, beta = {beta: .4f}')
-            if self.wandb_optimize:
-                wandb.log({
-                    f'rec_loss_{cls}_{self.fold_id}': np.mean(rec_losses[epoch]),
-                    f'contrastive_loss_{cls}_{self.fold_id}': np.mean(contrastive_losses),
-                    f'epoch_{cls}_{self.fold_id}': epoch,
-                })
+            
     
     def __rebuild_truth(self, num_nodes: int, edge_indices: Tensor, edge_weight: Tensor) -> Tensor:
         truth = torch.zeros(size=(num_nodes, num_nodes)).double()
