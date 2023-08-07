@@ -17,6 +17,7 @@ from src.dataset.torch_geometric.dataset_geometric import TorchGeometricDataset
 from src.explainer.explainer_base import Explainer
 from src.oracle.oracle_base import Oracle
 from src.utils.weight_schedulers import WeightScheduler
+from torch_geometric.nn.pool import global_mean_pool
 
 
 class ConDGCE(Explainer):
@@ -150,11 +151,11 @@ class ConDGCE(Explainer):
         embeddings = []
         for inst in dataset.instances:
             if inst not in self.counterfactuals[1-cls]:
-                embeddings.append(self.embed(autoencoder, inst).numpy())
+                embeddings.append(global_mean_pool(self.embed(autoencoder, inst), batch=None).numpy())
         embeddings = torch.from_numpy(np.array(embeddings))
         # calculate the pairwise Euclidean distance between latent and embeddings
         embeddings = embeddings.reshape(embeddings.shape[0], -1)
-        latent = latent.reshape(1, -1)
+        latent = global_mean_pool(latent, batch=None).reshape(1, -1)
         squared_distance = torch.sum((latent -  embeddings) ** 2, dim=1)
         # Take the square root to get the Euclidean distance
         distance = torch.sqrt(squared_distance)
