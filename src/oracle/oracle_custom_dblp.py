@@ -26,7 +26,7 @@ class DBLPCoAuthorshipCustomOracle(Oracle):
             self.read_oracle(self._name)
         else:
             self.weight_dict: Dict[int: float] = {}
-            for instance in dataset.instances:
+            for instance in dataset.dynamic_graph[self.first_train_timestamp].instances:
                 weights = list(nx.get_edge_attributes(instance.graph, 'weight').values())
                 self.weight_dict[instance.id] = np.mean(weights) if len(weights) > 0 else 0
             self.percentile_value = np.percentile(list(self.weight_dict.values()), self.percentile)
