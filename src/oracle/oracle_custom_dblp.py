@@ -1,12 +1,12 @@
 import os
 from typing import Dict
+from src.dataset.dataset_base import Dataset
 
 import jsonpickle
 import networkx as nx
 import numpy as np
 
 from src.dataset.data_instance_base import DataInstance
-from src.dataset.dataset_base import Dataset
 from src.oracle.oracle_base import Oracle
 
 
@@ -20,13 +20,14 @@ class DBLPCoAuthorshipCustomOracle(Oracle):
         self.first_train_timestamp = first_train_timestamp
 
     def fit(self, dataset: Dataset, split_i=-1):
+        print(dataset)
         self._name = f'{self._name}_fit_on_{dataset.name}_fold_id={self.fold_id}'
         # If there is an available oracle trained on that dataset load it
         if os.path.exists(os.path.join(self._oracle_store_path, self._name)):
             self.read_oracle(self._name)
         else:
             self.weight_dict: Dict[int: float] = {}
-            for instance in dataset.dynamic_graph[self.first_train_timestamp].instances:
+            for instance in dataset.instances:
                 weights = list(nx.get_edge_attributes(instance.graph, 'weight').values())
                 self.weight_dict[instance.id] = np.mean(weights) if len(weights) > 0 else 0
             self.percentile_value = np.percentile(list(self.weight_dict.values()), self.percentile)
