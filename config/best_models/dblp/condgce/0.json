@@ -27,7 +27,7 @@
                     "name": "dblp_coauthorship_custom_oracle", 
                     "parameters": {
                         "fold_id": 0,
-                        "fit": true
+                        "fit": "true"
                     }
                 },
                 "first_train_timestamp": 2000
