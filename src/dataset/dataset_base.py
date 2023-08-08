@@ -182,6 +182,7 @@ class Dataset(ABC):
         instance_number = 0
         # Iterate over each instance and load them
         for line in f_gnames.readlines():
+            print(f'Reading instance with id = {instance_number}')
             inst = DataInstance(id=instance_number)
             instance_number += 1
 

@@ -36,6 +36,7 @@ class DynamicDataset(ABC):
     
     def read_datasets(self, dataset_path, graph_format='edge_list'):
         for key, dataset in self.dynamic_graph.items():
+            print(f'Reading year {key}')
             dataset.read_data(os.path.join(dataset_path, f'{key}'), graph_format=graph_format)
             self.dynamic_graph[key] = dataset
     
