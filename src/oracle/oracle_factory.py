@@ -12,7 +12,7 @@ from src.oracle.embedder_graph2vec import Graph2vec
 from src.oracle.oracle_asd_custom import ASDCustomOracle
 from src.oracle.oracle_base import Oracle
 from src.oracle.oracle_cf2 import CF2Oracle
-from src.oracle.oracle_custom_btc_alpha import BTCAlphaCustomOracle
+#from src.oracle.oracle_custom_btc_alpha import BTCAlphaCustomOracle
 from src.oracle.oracle_custom_dblp import DBLPCoAuthorshipCustomOracle
 from src.oracle.oracle_gcn_tf import TfGCNOracle
 from src.oracle.oracle_id import IDOracle
@@ -142,7 +142,8 @@ class OracleFactory(ABC):
         
         
     def get_btc_alpha_oracle(self, config_dict=None):
-        return BTCAlphaCustomOracle(id=self._oracle_id_counter, oracle_store_path=self._oracle_store_path, config_dict=config_dict)
+        return None
+        #return BTCAlphaCustomOracle(id=self._oracle_id_counter, oracle_store_path=self._oracle_store_path, config_dict=config_dict)
         
     def get_id_oracle(self):
         clf = IDOracle(id=self._oracle_id_counter, oracle_store_path=self._oracle_store_path, config_dict=None)
