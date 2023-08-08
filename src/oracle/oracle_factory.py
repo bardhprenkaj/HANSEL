@@ -12,6 +12,7 @@ from src.oracle.embedder_graph2vec import Graph2vec
 from src.oracle.oracle_asd_custom import ASDCustomOracle
 from src.oracle.oracle_base import Oracle
 from src.oracle.oracle_cf2 import CF2Oracle
+from src.oracle.oracle_custom_btc_alpha import BTCAlphaCustomOracle
 from src.oracle.oracle_custom_dblp import DBLPCoAuthorshipCustomOracle
 from src.oracle.oracle_gcn_tf import TfGCNOracle
 from src.oracle.oracle_id import IDOracle
@@ -105,13 +106,11 @@ class OracleFactory(ABC):
         elif oracle_name == 'dblp_coauthorship_custom_oracle':
             fold_id = oracle_parameters.get('fold_id', 0)                
             percentile = oracle_parameters.get('percentile', 75)
-            fit = oracle_parameters.get('fit', False)
             first_train_timestamp = oracle_parameters.get('first_train_timestamp', 2000)
             
             return self.get_dblp_coauthorship_custom_oracle(dataset,
                                                             percentile=percentile,
                                                             fold_id=fold_id,
-                                                            fit=fit,
                                                             first_train_timestamp=first_train_timestamp,
                                                             config_dict=oracle_dict)
         elif oracle_name == 'dynamic_oracle':
@@ -132,11 +131,18 @@ class OracleFactory(ABC):
                                            timestamp=first_train_timestamp,
                                            config_dict=oracle_dict)
             
+        elif oracle_name == 'btc_alpha_oracle':
+            return self.get_btc_alpha_oracle(config_dict=oracle_dict)
+            
         elif oracle_name == 'id_oracle':
             return self.get_id_oracle()
         # If the oracle name does not match any oracle in the factory
         else:
             raise ValueError('''The provided oracle name does not match any oracle provided by the factory''')
+        
+        
+    def get_btc_alpha_oracle(self, config_dict=None):
+        return BTCAlphaCustomOracle(id=self._oracle_id_counter, oracle_store_path=self._oracle_store_path, config_dict=config_dict)
         
     def get_id_oracle(self):
         clf = IDOracle(id=self._oracle_id_counter, oracle_store_path=self._oracle_store_path, config_dict=None)
@@ -156,7 +162,6 @@ class OracleFactory(ABC):
                                             dataset: Dataset,
                                             percentile=75,
                                             fold_id=0,
-                                            fit=False,
                                             first_train_timestamp=0,
                                             config_dict=None):
         
@@ -167,9 +172,6 @@ class OracleFactory(ABC):
                                            oracle_store_path=self._oracle_store_path,
                                            config_dict=config_dict)
         self._oracle_id_counter +=1
-        
-        if fit:
-            clf.fit(dataset, fold_id)
 
         return clf
 
