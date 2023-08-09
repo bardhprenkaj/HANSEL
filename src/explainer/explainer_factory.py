@@ -20,7 +20,7 @@ from src.explainer.explainer_bidirectional_search import (
 from src.explainer.explainer_cf2 import CF2Explainer
 from src.explainer.explainer_cfgnnexplainer import CFGNNExplainer
 from src.explainer.explainer_clear import CLEARExplainer
-from src.explainer.explainer_countergan import CounteRGANExplainer
+from src.explainer.explainer_gcountergan import GCounteRGANExplainer
 from src.explainer.explainer_dce_search import (DCESearchExplainer,
                                                 DCESearchExplainerOracleless)
 from src.explainer.explainer_incremental_rand import IRandExplainer
@@ -642,7 +642,7 @@ class ExplainerFactory:
     def get_countergan_explainer(self, n_nodes, batch_size_ratio, device,
                                  training_iterations, n_discriminator_steps, n_generator_steps,
                                  n_labels, fold_id, ce_binarization_threshold, top_k_cf, config_dict=None) -> Explainer:
-        result = CounteRGANExplainer(self._explainer_id_counter,
+        result = GCounteRGANExplainer(self._explainer_id_counter,
                                      self._explainer_store_path,
                                      n_nodes=n_nodes,
                                      batch_size_ratio=batch_size_ratio,
