@@ -98,8 +98,8 @@ class CLEARExplainer(Explainer):
         self.explainer.eval()
         
         with torch.no_grad():
-            features = torch.from_numpy(np.array(instance.features)).float().to(self.device)
-            adj = torch.from_numpy(instance.to_numpy_array()).float().to(self.device)
+            features = torch.from_numpy(np.array(instance.features)).float().to(self.device)[None,:]
+            adj = torch.from_numpy(instance.to_numpy_array()).float().to(self.device)[None,:]
             u = torch.from_numpy(np.array(instance.causality)).float().to(self.device)[None,:]
             labels = torch.from_numpy(np.array([instance.graph_label])).to(self.device)[None,:]
             
@@ -384,7 +384,7 @@ class CLEAR(nn.Module):
             nn.Sigmoid()
         )
         
-        self.grpah_norm = nn.BatchNorm1d(self.h_dim)
+        self.graph_norm = nn.BatchNorm1d(self.h_dim)
         
         
     def encoder(self, features, u, adj, y_cf):
@@ -393,7 +393,7 @@ class CLEAR(nn.Module):
         # output: z
         graph_rep = self.graph_model(x=features, adj=adj, add_loop=False) # n x num_node x h_dim
         graph_rep  = self.graph_pooling(graph_rep, self.graph_pool_type) # n x h_dim
-        # graph_rep = self.graph_norm(graph_rep)
+        graph_rep = self.graph_norm(graph_rep)
         if self.disable_u:
             z_mu = self.encoder_mean(torch.cat((graph_rep, y_cf), dim=1))
             z_logvar = self.encoder_var(torch.cat((graph_rep, y_cf), dim=1))
@@ -466,6 +466,11 @@ class CLEAR(nn.Module):
         z_sample = self.reparametrize(z_mu, z_logvar)
         # decoder        
         features_reconst, adj_reconst = self.decoder(z_sample, y_cf, u_onehot)
+        n = features_reconst.shape[1]
+        m = features.shape[1]
+        features = torch.nn.functional.pad(features, (0, 0, 0, n-m, 0, 0), mode='constant', value=0)
+        adj = torch.nn.functional.pad(adj, (0, n-m, 0, n-m), mode='constant', value=0)
+        
         
         return {
             'z_mu': z_mu,

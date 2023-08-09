@@ -1,0 +1,65 @@
+{
+    "store_paths": [
+        {"name": "dataset_store_path", "address": "./data/datasets/"},
+        {"name": "embedder_store_path", "address": "./data/embedders/"},
+        {"name": "oracle_store_path", "address": "./data/oracles/"},
+        {"name": "explainer_store_path", "address": "./data/explainers/DBLP/clear"},
+        {"name": "output_store_path", "address": "./output/DBLP"}
+    ],
+    "datasets": [
+        {
+            "name": "coauthorship_dblp", 
+            "parameters": {
+                "begin_time": 2000,
+                "end_time": 2001,
+                "sampling_ratio": 0.2,
+                "percentile": 75,
+                "min_nodes_per_egonet": 10,
+                "features_dim": 10
+            } 
+        }
+    ],
+    "oracles": [
+        {
+            "name": "dynamic_oracle",
+            "parameters": {
+                "base_oracle" : {
+                    "name": "dblp_coauthorship_custom_oracle", 
+                    "parameters": {
+                        "fold_id": 0,
+                        "fit": "true"
+                    }
+                },
+                "first_train_timestamp": 2000
+            }
+        }
+    ],
+    "explainers": [
+        {
+            "name": "clear",
+            "parameters":{
+                "n_nodes": 28,
+                "n_labels": 2,
+                "fold_id": 3,
+                "epochs": 50,
+                "alpha": 0,
+                "batch_size_ratio": 0.1,
+                "dropout": 0.1,
+                "lambda_cfe": 0.1,
+                "lambda_kl": 0.1,
+                "lambda_sim": 0.1,
+                "feature_dim": 5,
+                "lr": 0.001,
+                "weight_decay": 0.00001
+            } 
+        }
+    ],
+    "evaluation_metrics": [ 
+        {"name": "graph_edit_distance", "parameters": {}},
+        {"name": "oracle_calls", "parameters": {}},
+        {"name": "correctness", "parameters": {}},
+        {"name": "sparsity", "parameters": {}},
+        {"name": "fidelity", "parameters": {}},
+        {"name": "oracle_accuracy", "parameters": {}}
+    ]
+}
