@@ -1,0 +1,58 @@
+{
+    "store_paths": [
+        {"name": "dataset_store_path", "address": "./data/datasets/"},
+        {"name": "embedder_store_path", "address": "./data/embedders/"},
+        {"name": "oracle_store_path", "address": "./data/oracles/"},
+        {"name": "explainer_store_path", "address": "./data/explainers/"},
+        {"name": "output_store_path", "address": "./output/DBLP"}
+    ],
+    "datasets": [
+        {
+            "name": "coauthorship_dblp", 
+            "parameters": {
+                "begin_time": 2000,
+                "end_time": 2010,
+                "sampling_ratio": 0.2,
+                "percentile": 75,
+                "min_nodes_per_egonet": 10,
+                "features_dim": 10
+            } 
+        }
+    ],
+    "oracles": [
+        {
+            "name": "dynamic_oracle",
+            "parameters": {
+                "base_oracle" : {
+                    "name": "tree_cycles_custom_oracle", 
+                    "parameters": {}
+                },
+                "first_train_timestamp": 2000
+                
+            }   
+        }
+    ],
+    "explainers": [
+        {
+            "name": "dygrace",
+            "parameters": { 
+                "in_channels": 4,
+                "out_channels": 4,
+                "epochs_ae": 150,
+                "fold_id": 3,
+                "lr": 1e-4,
+                "autoencoder_name":"gae",
+                "encoder_name": "gcn_encoder",
+                "top_k_cf": 10
+            }
+        }
+    ],
+    "evaluation_metrics": [ 
+        {"name": "graph_edit_distance", "parameters": {}},
+        {"name": "oracle_calls", "parameters": {}},
+        {"name": "correctness", "parameters": {}},
+        {"name": "sparsity", "parameters": {}},
+        {"name": "fidelity", "parameters": {}},
+        {"name": "oracle_accuracy", "parameters": {}}
+    ]
+}
