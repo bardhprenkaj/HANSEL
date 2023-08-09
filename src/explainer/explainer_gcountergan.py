@@ -67,15 +67,26 @@ class GCounteRGANExplainer(Explainer):
             torch_data_instance = torch.from_numpy(instance.to_numpy_array())[None, None, :, :]
             torch_data_instance = torch_data_instance.to(torch.float)
             explainer = self.explainers[np.argmax(pred_scores)].generator
-            """ignore_index = np.argmax(pred_scores)"""
             explainer.eval()
             
-            counterfactuals: List[DataInstance] = []
-            for _ in range(self.k):
-                counterfactual = explainer(torch_data_instance).squeeze().cpu().numpy()
-                cf_instance = DataInstance(instance.id)
-                cf_instance.from_numpy_array(counterfactual, store=True)
-                counterfactuals.append(cf_instance)
+            curr_nodes = torch_data_instance.shape[-1]
+            
+            try:
+                torch_data_instance = torch.nn.functional.pad(torch_data_instance,
+                                                            (0, self.n_nodes - curr_nodes, 0, self.n_nodes - curr_nodes),
+                                                            mode='constant',
+                                                            value=0)
+                                
+                counterfactuals: List[DataInstance] = []
+                for _ in range(self.k):
+                    counterfactual = explainer(torch_data_instance).squeeze().cpu().numpy()
+                    cf_instance = DataInstance(instance.id)
+                    cf_instance.from_numpy_array(counterfactual, store=True)
+                    counterfactuals.append(cf_instance)
+            except: 
+                # it might happen that the padding cannot be done since the new instance has more nodes than self.n_nodes.
+                # In this case, the model hasn't been trained to deal with them
+                return [instance]
             
             return counterfactuals
     
@@ -85,7 +96,11 @@ class GCounteRGANExplainer(Explainer):
             torch.save(explainer.state_dict(),
                        os.path.join(self.explainer_store_path, self.name, f'explainer_{i}'))
 
-    def load_explainers(self):
+    def load_explainers(self, dataset: Dataset):
+        # cold-start problem. we need to load the models according
+        # to the highest number of nodes
+        self.transform_data(dataset, self.fold_id, class_to_explain=0)
+        # load the models now
         for i in range(self.n_labels):
             self.explainers[i].load_state_dict(
                 torch.load(
@@ -101,7 +116,7 @@ class GCounteRGANExplainer(Explainer):
         if os.path.exists(explainer_uri):
             # Load the weights of the trained model
             self.name = explainer_name
-            self.load_explainers()
+            self.load_explainers(dataset)
 
         else:
             # Create the folder to store the oracle if it does not exist
@@ -240,7 +255,7 @@ class GCounteRGANExplainer(Explainer):
         X  = np.array([i.to_numpy_array() for i in dataset.instances])
         y = np.array([i.graph_label for i in dataset.instances])
         
-        X, n_nodes = self.__pad_matrices(X)
+        X, self.n_nodes = self.__pad_matrices(X)
         
         X_train = X[dataset.get_split_indices()[fold_id]['train']]
         y_train = y[dataset.get_split_indices()[fold_id]['train']]
@@ -280,7 +295,7 @@ class GCounteRGANExplainer(Explainer):
         
         # multi-class support
         self.explainers = [
-            CounteRGAN(n_nodes,
+            CounteRGAN(self.n_nodes,
                        residuals=True,
                        ce_binarization_threshold=self.ce_binarization_threshold).to(self.device) for _ in range(self.n_labels)
         ]
