@@ -149,6 +149,7 @@ class DyGRACE(Explainer):
     def __fit_ae(self, oracle: Oracle, dataset: Dataset):
         data_loaders = self.transform_data(oracle, dataset)
         for cls, data_loader in enumerate(data_loaders):
+            print(f'Training for class = {cls}')
             self.__train(data_loader, cls)
             
     def update(self, instance: DataInstance, counterfactuals: List[DataInstance], factuals: List[DataInstance], oracle):
@@ -430,11 +431,12 @@ class DyGRACE(Explainer):
             losses = []
             for item in data_loader:
                 x, edge_index, edge_weight, _, truth = self.__expand(item)
-
+                
                 optimiser.zero_grad()
 
-                z, _ = self.autoencoders[cls].encode(x, edge_index=edge_index, edge_weight=edge_weight)
-                loss = self.autoencoders[cls].loss(z, truth)
+                z, _ = self.autoencoders[cls].encode(x, edge_index=edge_index, edge_weight=edge_weight, batch=item.batch)
+                rec_adj = self.autoencoders[cls].decoder.forward_all(z)
+                loss = self.autoencoders[cls].loss(rec_adj, truth)
                 if maximise:
                     loss = (1 / loss * self.EPS)               
                 loss.backward()

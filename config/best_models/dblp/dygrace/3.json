@@ -24,7 +24,7 @@
             "name": "dynamic_oracle",
             "parameters": {
                 "base_oracle" : {
-                    "name": "tree_cycles_custom_oracle", 
+                    "name": "dblp_coauthorship_custom_oracle", 
                     "parameters": {}
                 },
                 "first_train_timestamp": 2000
@@ -41,8 +41,13 @@
                 "epochs_ae": 150,
                 "fold_id": 3,
                 "lr": 1e-4,
-                "autoencoder_name":"gae",
-                "encoder_name": "gcn_encoder",
+                "encoder": {
+                    "name": "gcn_encoder",
+                    "parameters": {
+                        "input_dim": 4,
+                        "out_dim": 4
+                    }
+                },
                 "top_k_cf": 10
             }
         }

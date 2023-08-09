@@ -315,7 +315,7 @@ class ExplainerFactory:
         elif explainer_name == 'dygrace':
             # encoder parameters
             encoder = explainer_parameters['encoder']
-            encoder_name = encoder.get('name', 'vgae_')
+            encoder_name = encoder.get('name', 'gcn_encoder')
             if 'parameters' not in encoder:
                 raise ValueError('''The encoder of DyGRACE needs to have parameters, even if they're empty''')
             encoder_params = encoder['parameters']
