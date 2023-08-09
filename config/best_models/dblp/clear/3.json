@@ -11,7 +11,7 @@
             "name": "coauthorship_dblp", 
             "parameters": {
                 "begin_time": 2000,
-                "end_time": 2001,
+                "end_time": 2010,
                 "sampling_ratio": 0.2,
                 "percentile": 75,
                 "min_nodes_per_egonet": 10,
