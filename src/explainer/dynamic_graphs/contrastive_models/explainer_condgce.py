@@ -1,7 +1,6 @@
 
 import json
 import os
-import random
 from collections import Counter
 from typing import List, Tuple
 
@@ -64,7 +63,7 @@ class ConDGCE(Explainer):
         
     def explain(self, instance, oracle: Oracle, dataset: Dataset):
         explainer_name = f'{self.__class__.__name__}_fit_on_{dataset.name}_fold_id_{self.fold_id}'\
-            + f'_batch={self.batch_size}_lr={self.lr}_e={self.epochs}_k={self.k}'\
+            + f'_batch={self.batch_size}_lr={self.lr}_e={self.epochs}_k={self.k}_lam={self.lam}'\
                     + f'_alpha={self.alpha_scheduler.__class__.__name__}'\
                         + f'_beta={self.beta_scheduler.__class__.__name__}'
                         
