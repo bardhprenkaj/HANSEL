@@ -12,7 +12,7 @@ from src.oracle.embedder_graph2vec import Graph2vec
 from src.oracle.oracle_asd_custom import ASDCustomOracle
 from src.oracle.oracle_base import Oracle
 from src.oracle.oracle_cf2 import CF2Oracle
-#from src.oracle.oracle_custom_btc_alpha import BTCAlphaCustomOracle
+from src.oracle.oracle_custom_btc_alpha import BTCAlphaCustomOracle
 from src.oracle.oracle_custom_dblp import DBLPCoAuthorshipCustomOracle
 from src.oracle.oracle_gcn_tf import TfGCNOracle
 from src.oracle.oracle_id import IDOracle
@@ -123,7 +123,7 @@ class OracleFactory(ABC):
             base_oracle = self.get_oracle_by_name(oracle_dict['parameters']['base_oracle'],
                                                   dataset,
                                                   emb_factory)
-            
+                        
             first_train_timestamp = oracle_dict['parameters']['first_train_timestamp'] 
             
             return self.get_dynamic_oracle(dataset,
@@ -142,8 +142,9 @@ class OracleFactory(ABC):
         
         
     def get_btc_alpha_oracle(self, config_dict=None):
-        return None
-        #return BTCAlphaCustomOracle(id=self._oracle_id_counter, oracle_store_path=self._oracle_store_path, config_dict=config_dict)
+        clf = BTCAlphaCustomOracle(id=self._oracle_id_counter, oracle_store_path=self._oracle_store_path, config_dict=config_dict)
+        self._oracle_id_counter += 1
+        return clf
         
     def get_id_oracle(self):
         clf = IDOracle(id=self._oracle_id_counter, oracle_store_path=self._oracle_store_path, config_dict=None)

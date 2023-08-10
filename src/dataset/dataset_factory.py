@@ -10,6 +10,7 @@ from src.dataset.dataset_imbd import IMDBDataset
 from src.dataset.dataset_node import NodeDataset
 from src.dataset.dataset_synthetic_generator import Synthetic_Data
 from src.dataset.dataset_trisqr import TrianglesSquaresDataset
+from src.dataset.dynamic_graphs.dataset_btc_alpha import BTCAlpha
 from src.dataset.dynamic_graphs.dataset_coauthorship_dblp import \
     CoAuthorshipDBLP
 from src.dataset.dynamic_graphs.dynamic_tree_cycles import DynTreeCycles
@@ -144,7 +145,7 @@ class DatasetFactory():
             begin_time = params_dict['begin_time']
             end_time = params_dict['end_time']
             
-            assert (begin_time < end_time)
+            assert (begin_time <= end_time)
             
             percentile = params_dict.get('percentile', 75)
             sampling_ratio = params_dict.get('sampling_ratio', .05)
@@ -180,12 +181,53 @@ class DatasetFactory():
                                                 n_nodes=n_nodes,
                                                 nodes_in_cycle=nodes_in_cycle,
                                                 dataset_dict=dataset_dict)
+            
+        elif dataset_name == 'btc_alpha':
+            if not 'begin_time' in params_dict:
+                raise ValueError('"begin_time" is mandatory for CoAuthorshipDBLP')
+            if not 'end_time' in params_dict:
+                raise ValueError('"end_time" is mandatory for CoAuthorshipDBLP')
+            
+            begin_time = params_dict['begin_time']
+            end_time = params_dict['end_time']
+            
+            assert (begin_time < end_time)
+            
+            filter_min_graphs = params_dict.get('filter_min_graphs', 10)
+            
+            return self.get_btc_alpha(begin_time=begin_time,
+                                      end_time=end_time,
+                                      filter_min_graphs=filter_min_graphs)
         
         # If the dataset name does not match any of the datasets provided by the factory
         else:
             raise ValueError('''The provided dataset name is not valid. Valid names include: tree-cycles,
              tree-cycles-balanced, tree-cycles-dummy''')
             
+            
+    def get_btc_alpha(self, begin_time, end_time, filter_min_graphs, dataset_dict=None):
+        
+        result = BTCAlpha(id=self._dataset_id_counter,
+                          begin_t=begin_time,
+                          end_t=end_time,
+                          filter_min_graphs=filter_min_graphs,
+                          config_dict=dataset_dict)
+        self._dataset_id_counter += 1
+        ds_name = 'btc_alpha'
+        ds_uri = os.path.join(self._data_store_path, 'dynamic_graphs', ds_name, 'processed')
+        ds_exists = os.path.exists(ds_uri)
+        
+        if ds_exists:
+            result.read_datasets(ds_uri)
+        else:
+            result.read_csv_file(os.path.join(self._data_store_path, 'dynamic_graphs', ds_name))
+            result.build_temporal_graph()
+            result.load_or_generate_splits(os.path.join(self._data_store_path, 'dynamic_graphs', ds_name),
+                                           n_splits=10, shuffle=True)
+            result.write_datasets(ds_uri)
+            
+        return result
+    
     def get_dynamic_tree_cycles(self, begin_time, end_time,
                                 num_instances_per_snapshot=300,
                                 n_nodes=300,
