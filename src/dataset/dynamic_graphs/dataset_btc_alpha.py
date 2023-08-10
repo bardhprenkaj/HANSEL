@@ -3,15 +3,13 @@ from src.dataset.data_instance_features import DataInstanceWFeatures, DataInstan
 from src.dataset.dataset_base import Dataset
 from src.dataset.dynamic_graphs.dataset_dynamic import DynamicDataset
 
-
 import networkx as nx
 import numpy as np
 import os
 import pandas as pd
-import community
-from typing import Dict, List
+import itertools
+from typing import Dict
 
-from collections import defaultdict
 
 class BTCAlpha(DynamicDataset):
     
@@ -20,11 +18,13 @@ class BTCAlpha(DynamicDataset):
                  begin_t,
                  end_t,
                  filter_min_graphs=10,
+                 number_of_communities=15,
                  config_dict=None) -> None:
         
         super().__init__(id, begin_t, end_t, config_dict)
         self.name = 'btc_alpha'   
-        self.filter_min_graphs = filter_min_graphs         
+        self.filter_min_graphs = filter_min_graphs
+        self.number_of_communities = number_of_communities         
         
     def read_csv_file(self, dataset_path):
         # read the number of vertices in for each simplex
@@ -65,17 +65,22 @@ class BTCAlpha(DynamicDataset):
         print(f'Finished preprocessing.')
                 
     def __get_communities(self, temporal_graph):
+        
+        def most_central_edge(G):
+            centrality = nx.edge_betweenness_centrality(G, weight="weight")
+            return max(centrality, key=centrality.get)
+        
         for t in range(max(self.begin_t, min(temporal_graph.keys())), min(self.end_t, max(temporal_graph.keys()))+1):
             instance_id = 0
-            communities = nx.community.girvan_newman(temporal_graph[t])
-            for community in communities:
+            communities = nx.community.girvan_newman(temporal_graph[t], most_valuable_edge=most_central_edge)
+            for community in itertools.islice(communities, self.number_of_communities):
+                community = [s for s in community if 50 >= len(s) > self.filter_min_graphs]
                 for nodes in community:
                     subgraph = temporal_graph[t].subgraph(list(nodes))
-                    if subgraph.number_of_nodes() > self.filter_min_graphs:
-                        print(subgraph)
-                        self.__create_data_instance(id=instance_id, graph=subgraph,
-                                                    year=t, label=self.__get_label(subgraph))
-                        instance_id += 1                      
+                    print(subgraph)
+                    self.__create_data_instance(id=instance_id, graph=subgraph,
+                                                year=t, label=self.__get_label(subgraph))
+                    instance_id += 1                      
     
     def __create_data_instance(self, id: int, graph: nx.Graph, year: int, label: float):
         instance = DataInstance(id=id)
