@@ -3,8 +3,8 @@
         {"name": "dataset_store_path", "address": "./data/datasets/"},
         {"name": "embedder_store_path", "address": "./data/embedders/"},
         {"name": "oracle_store_path", "address": "./data/oracles/"},
-        {"name": "explainer_store_path", "address": "./data/explainers/DBLP/condgce_gat_decoder"},
-        {"name": "output_store_path", "address": "./output/DBLP"}
+        {"name": "explainer_store_path", "address": "./data/explainers/BTC/condgce_gat_decoder"},
+        {"name": "output_store_path", "address": "./output/BTC"}
     ],
     "datasets": [
         {
