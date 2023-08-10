@@ -71,11 +71,11 @@ class BTCAlpha(DynamicDataset):
             for community in communities:
                 for nodes in community:
                     subgraph = temporal_graph[t].subgraph(list(nodes))
-                    print(subgraph)
-                    #if subgraph.number_of_nodes() > self.filter_min_graphs:
-                    self.__create_data_instance(id=instance_id, graph=subgraph,
+                    if subgraph.number_of_nodes() > self.filter_min_graphs:
+                        print(subgraph)
+                        self.__create_data_instance(id=instance_id, graph=subgraph,
                                                     year=t, label=self.__get_label(subgraph))
-                    instance_id += 1                      
+                        instance_id += 1                      
     
     def __create_data_instance(self, id: int, graph: nx.Graph, year: int, label: float):
         instance = DataInstance(id=id)
