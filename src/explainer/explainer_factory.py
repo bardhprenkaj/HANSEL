@@ -418,6 +418,7 @@ class ExplainerFactory:
             in_dim = explainer_parameters.get('in_dim', 4)
             replace_rate = explainer_parameters.get('replace_rate', .1)
             mask_rate = explainer_parameters.get('mask_rate', .3)
+            lam = explainer_parameters.get('lambda', .5)
                         
             encoder = self._autoencoder_factory.get_encoder(encoder_name, **encoder_params)
             decoder = self._autoencoder_factory.get_decoder(decoder_name, **decoder_params)
@@ -437,6 +438,7 @@ class ExplainerFactory:
                                     lr=lr,
                                     k=top_k_cf,
                                     fold_id=fold_id,
+                                    lam=lam,
                                     config_dict=explainer_dict)
         else:
             raise ValueError('''The provided explainer name does not match any explainer provided 
@@ -451,6 +453,7 @@ class ExplainerFactory:
                     lr: float = 1e-3,
                     k: int = 10,
                     fold_id: int = 0,
+                    lam: int = .5,
                     config_dict = None) -> Explainer:
         
         result = ConDGCE(id=self._explainer_id_counter,
@@ -459,7 +462,7 @@ class ExplainerFactory:
                      alpha_scheduler=alpha_scheduler,
                      beta_scheduler=beta_scheduler,
                      batch_size=batch_size,
-                     epochs=epochs,
+                     epochs=epochs, lam=lam,
                      lr=lr, k=k, fold_id=fold_id,
                      config_dict=config_dict)
         
