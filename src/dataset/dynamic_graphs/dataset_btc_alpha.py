@@ -27,10 +27,11 @@ class BTCAlpha(DynamicDataset):
         
     def read_csv_file(self, dataset_path):
         # read the number of vertices in for each simplex
-        ratings = pd.read_csv(os.path.join(dataset_path, 'soc-bitcoin.edges'))
-        ratings.columns=['source','target','rating','time']
-        print(ratings.head(50))
-        ratings['year'] = ratings.time.apply(lambda x : pd.to_datetime(x, unit='s').year)
+        ratings = pd.read_csv(os.path.join(dataset_path, 'real_bitcoin_alpha_user.txt'), sep='\t')
+        ratings.columns=['source','target','time','rating','comment']
+        
+        print(ratings.head(10))
+        ratings['year'] = ratings.time.apply(lambda x : pd.to_datetime(x).year)
         # retain only desired history
         ratings = ratings[(ratings.year >= self.begin_t) & (ratings.year <= self.end_t)]
         print("Now proceeding to grouping")
@@ -39,14 +40,19 @@ class BTCAlpha(DynamicDataset):
     
     def build_temporal_graph(self):
         self.unprocessed_data = {}
+        self.mean_weights = 0
+        it = 0
         for year, df in self.grouped_by_time:
             print(f'Working for time={year}')
             G = nx.DiGraph()
             source, target, weights = df.source.values.tolist(), df.target.values.tolist(), df.rating.values.tolist()
+            if it == 0:
+                self.mean_weights = np.mean(weights)
             G.add_nodes_from(source + target)
             for u, v, w in zip(source, target, weights):
                 if not G.has_edge(u, v):
                     G.add_edge(u, v, weight=w)
+                
             # year -> entire graph of coauthor simplices
             self.unprocessed_data[year] = G
         
@@ -60,7 +66,7 @@ class BTCAlpha(DynamicDataset):
         # clear those snapshots that are empty
         for i in range(self.begin_t, self.end_t + 1):
             self.dynamic_graph[i].name = str(i)
-            if self.dynamic_graph[i].get_data_len() == 0:
+            if self.dynamic_graph[i].get_data_len() <= self.number_of_communities:
                 self.dynamic_graph.pop(i, None)
         print(self.dynamic_graph)
         print(f'Finished preprocessing.')

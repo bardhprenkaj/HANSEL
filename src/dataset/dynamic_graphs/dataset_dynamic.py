@@ -35,10 +35,19 @@ class DynamicDataset(ABC):
         pass
     
     def read_datasets(self, dataset_path, graph_format='edge_list'):
+        eliminate = []
         for key, dataset in self.dynamic_graph.items():
-            print(f'Reading year {key}')
-            dataset.read_data(os.path.join(dataset_path, f'{key}'), graph_format=graph_format)
-            self.dynamic_graph[key] = dataset
+            try:
+                print(f'Reading year {key}')
+                dataset.read_data(os.path.join(dataset_path, f'{key}'), graph_format=graph_format)
+                self.dynamic_graph[key] = dataset
+            except:
+                print(f'Dataset at year {key} does not exist')
+                eliminate.append(key)
+                
+        for key in eliminate:
+            if key in self.dynamic_graph:
+                del self.dynamic_graph[key]
     
     def write_datasets(self, dataset_path, graph_format='edge_list'):
         if not os.path.exists(dataset_path):

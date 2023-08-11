@@ -38,10 +38,10 @@
         {
             "name": "condgce",
             "parameters": { 
-                "epochs_ae": 350,
+                "epochs_ae": 100,
                 "fold_id": 0,
                 "lr": 1e-3,
-                "top_k_cf": 50,
+                "top_k_cf": 10,
                 "batch_size": 64,
                 "kl_weight": 0.5,
                 "in_dim": 4,
