@@ -9,6 +9,7 @@ import pandas as pd
 from typing import Dict
 
 
+
 class BTCAlpha(DynamicDataset):
     
     def __init__(self,
@@ -29,7 +30,6 @@ class BTCAlpha(DynamicDataset):
         ratings = pd.read_csv(os.path.join(dataset_path, 'soc-bitcoin.edges'), header=None, names=['source','target','rating','time'])
         ratings.time = ratings.time.apply(lambda x : pd.to_datetime(x, unit='s'))
         ratings['year'] = ratings.time.apply(lambda x : x.year)
-        ratings = ratings.sort_values(by='year')
         # retain only desired history
         ratings = ratings[(ratings.year >= self.begin_t) & (ratings.year <= self.end_t)]
         
