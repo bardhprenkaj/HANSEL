@@ -27,7 +27,8 @@ class BTCAlpha(DynamicDataset):
         
     def read_csv_file(self, dataset_path):
         # read the number of vertices in for each simplex
-        ratings = pd.read_csv(os.path.join(dataset_path, 'soc-bitcoin.edges'), names=['source','target','rating','time'])
+        ratings = pd.read_csv(os.path.join(dataset_path, 'soc-bitcoin.edges'))
+        ratings.columns=['source','target','rating','time']
         print(ratings.head(50))
         ratings['year'] = ratings.time.apply(lambda x : pd.to_datetime(x, unit='s').year)
         # retain only desired history
