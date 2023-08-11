@@ -20,8 +20,8 @@ class BTCAlphaCustomOracle(Oracle):
         pass
 
     def _real_predict(self, data_instance: DataInstance):
-        ratings = list(nx.get_edge_attributes(data_instance.graph, 'weight').values())
-        return 1 if np.sum(ratings > 0) >= np.sum(ratings < 0) else 0   
+        ratings = np.array(list(nx.get_edge_attributes(data_instance.graph, 'weight').values()))
+        return 1 if np.sum(ratings < 0) else 0
         
     def _real_predict_proba(self, data_instance):
         return np.array([0, 1]) if self._real_predict(data_instance) else np.array([1, 0])

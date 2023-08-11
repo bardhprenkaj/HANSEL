@@ -10,7 +10,7 @@ class DynamicDataset(ABC):
     def __init__(self, id, begin_t, end_t, config_dict=None) -> None:    
         super().__init__()
 
-        assert (begin_t < end_t)
+        assert (begin_t <= end_t)
         
         self._id = id
         self._name = 'dynamic_graph_dataset'
@@ -54,6 +54,7 @@ class DynamicDataset(ABC):
             if not os.path.exists(dataset_path):
                 os.makedirs(dataset_path)
             splits_uri = os.path.join(dataset_path)
+            n_splits = min(len(dataset.instances), n_splits)
             self.splits[key] = dataset.load_or_generate_splits(splits_uri,
                                                                n_splits=n_splits,
                                                                shuffle=shuffle)

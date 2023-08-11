@@ -191,7 +191,7 @@ class DatasetFactory():
             begin_time = params_dict['begin_time']
             end_time = params_dict['end_time']
             
-            assert (begin_time < end_time)
+            assert (begin_time <= end_time)
             
             filter_min_graphs = params_dict.get('filter_min_graphs', 10)
             

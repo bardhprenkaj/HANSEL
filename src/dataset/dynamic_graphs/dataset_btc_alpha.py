@@ -1,13 +1,11 @@
 from src.dataset.data_instance_base import DataInstance
-from src.dataset.data_instance_features import DataInstanceWFeatures, DataInstanceWFeaturesAndWeights
-from src.dataset.dataset_base import Dataset
+from src.dataset.data_instance_features import DataInstanceWFeaturesAndWeights
 from src.dataset.dynamic_graphs.dataset_dynamic import DynamicDataset
 
 import networkx as nx
 import numpy as np
 import os
 import pandas as pd
-import itertools
 from typing import Dict
 
 
@@ -28,7 +26,7 @@ class BTCAlpha(DynamicDataset):
         
     def read_csv_file(self, dataset_path):
         # read the number of vertices in for each simplex
-        ratings = pd.read_csv(os.path.join(dataset_path, 'soc-sign-bitcoinalpha.edges'), header=None, names=['source','target','rating','time'])
+        ratings = pd.read_csv(os.path.join(dataset_path, 'soc-bitcoin.edges'), header=None, names=['source','target','rating','time'])
         ratings.time = ratings.time.apply(lambda x : pd.to_datetime(x, unit='s'))
         ratings['year'] = ratings.time.apply(lambda x : x.year)
         ratings = ratings.sort_values(by='year')
@@ -42,7 +40,7 @@ class BTCAlpha(DynamicDataset):
         self.unprocessed_data = {}
         for year, df in self.grouped_by_time:
             print(f'Working for time={year}')
-            G = nx.Graph()
+            G = nx.DiGraph()
             source, target, weights = df.source.values.tolist(), df.target.values.tolist(), df.rating.values.tolist()
             G.add_nodes_from(source + target)
             for u, v, w in zip(source, target, weights):
@@ -60,24 +58,21 @@ class BTCAlpha(DynamicDataset):
         print('Eliminating the empty snapshots')
         # clear those snapshots that are empty
         for i in range(self.begin_t, self.end_t + 1):
-            if self.dynamic_graph[i].get_data_len() > 0:
+            self.dynamic_graph[i].name = str(i)
+            if self.dynamic_graph[i].get_data_len() == 0:
                 self.dynamic_graph.pop(i, None)
+        print(self.dynamic_graph)
         print(f'Finished preprocessing.')
                 
     def __get_communities(self, temporal_graph):
         
-        def most_central_edge(G):
-            centrality = nx.edge_betweenness_centrality(G, weight="weight")
-            return max(centrality, key=centrality.get)
-        
         for t in range(max(self.begin_t, min(temporal_graph.keys())), min(self.end_t, max(temporal_graph.keys()))+1):
             instance_id = 0
-            communities = nx.community.girvan_newman(temporal_graph[t], most_valuable_edge=most_central_edge)
-            for community in itertools.islice(communities, self.number_of_communities):
-                community = [s for s in community if 50 >= len(s) > self.filter_min_graphs]
-                for nodes in community:
-                    subgraph = temporal_graph[t].subgraph(list(nodes))
-                    print(subgraph)
+            weights_at_t = np.array(list(nx.get_edge_attributes(temporal_graph[t], 'weight').values()))
+            if np.sum(weights_at_t < 0):
+                communities = nx.community.greedy_modularity_communities(temporal_graph[t], weight='weight')
+                for community in communities:
+                    subgraph = temporal_graph[t].subgraph(list(community))
                     self.__create_data_instance(id=instance_id, graph=subgraph,
                                                 year=t, label=self.__get_label(subgraph))
                     instance_id += 1                      
@@ -88,12 +83,12 @@ class BTCAlpha(DynamicDataset):
         instance.graph = graph
         instance.graph_label = label
         instance = self.__generate_node_features(instance)
-        print(f'Adding DataInstance with id = {id} @year={year}')
+        print(f'Adding DataInstance with id = {id} @year={year} with label = {label}')
         self.dynamic_graph[year].instances.append(instance)
     
     def __get_label(self, graph: nx.Graph) -> Dict[int, int]:      
         ratings = np.array(list(nx.get_edge_attributes(graph, 'weight').values()))
-        return 1 if np.sum(ratings > 0) >= np.sum(ratings < 0) else 0            
+        return 1 if np.sum(ratings < 0) else 0            
 
     def __generate_node_features(self, instance: DataInstance) -> DataInstanceWFeaturesAndWeights:
         graph = instance.graph
