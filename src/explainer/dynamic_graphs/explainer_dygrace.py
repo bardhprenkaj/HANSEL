@@ -81,7 +81,7 @@ class DyGRACE(Explainer):
             counterfactuals = self.__sample_k(dataset, df, dim=1) if len(counterfactuals) else [instance]
 
             if self.iteration > 0:
-                self.update(deepcopy(instance),
+                self.change(deepcopy(instance),
                             deepcopy(counterfactuals),
                             deepcopy(factuals),
                             oracle)
@@ -152,7 +152,7 @@ class DyGRACE(Explainer):
             print(f'Training for class = {cls}')
             self.__train(data_loader, cls)
             
-    def update(self, instance: DataInstance, counterfactuals: List[DataInstance], factuals: List[DataInstance], oracle):
+    def change(self, instance: DataInstance, counterfactuals: List[DataInstance], factuals: List[DataInstance], oracle):
         # the contrastive learner fails to produce a valid counterfactual
         # in these cases, just save the previous autoencoders and contrastive learner
         if len(counterfactuals) == 1 and counterfactuals[0].id == instance.id:
@@ -278,7 +278,7 @@ class DyGRACE(Explainer):
                 curr_row = {'tuple': [], 'y': -1, 'rec_cf': 0, 'rec_f': 1}
                 # set dummy reconstruction errors for all elements in the tuple
                 # set dummy similarity for all elements in the tuple
-                curr_row.update({f'sim_{i}': 0 for i in range(len(indices) - 1)})
+                curr_row.change({f'sim_{i}': 0 for i in range(len(indices) - 1)})
                 # for all the other instances in the tuple
                 # get the reconstruction errors (counterfactual and factual)
                 # and their similarity with the anchor
@@ -305,7 +305,6 @@ class DyGRACE(Explainer):
                 curr_row['y'] = cls
                 curr_row['tuple'] = indices
                 rows.append(curr_row)
-                print(rows)
                 
         return rows
             
