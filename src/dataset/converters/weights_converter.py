@@ -22,14 +22,13 @@ class DefaultFeatureAndWeightConverter(ConverterAB):
                                                 node_labels=instance.node_labels,
                                                 edge_labels=instance.edge_labels,
                                                 graph_dgl=instance.graph_dgl)
-
-        if not hasattr(instance, 'features'):
-            converted_instance.features = self.__create_dummy(instance, self.feature_dim)
-        
-        if not hasattr(instance, 'weights'):
-            converted_instance.weights = self.__create_dummy(instance, self.weight_dim)
+        converted_instance.features = self.__create_features(instance, self.feature_dim)
+        converted_instance.weights = self.__create_weights(instance, self.weight_dim)
         
         return converted_instance
     
-    def __create_dummy(self, instance: DataInstance, dim: int):
+    def __create_features(self, instance: DataInstance, dim: int):
         return np.random.normal(0, 1, (instance.graph.number_of_nodes(), dim))
+    
+    def __create_weights(self, instance, dim: int):
+        return np.random.normal(0, 1, (instance.graph.number_of_edges(), dim))

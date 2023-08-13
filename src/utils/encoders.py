@@ -40,17 +40,27 @@ class GCNEncoder(nn.Module, Encoder):
         self.conv1 = GCNConv(in_channels, 2 * out_channels)
         self.conv2 = GCNConv(2 * out_channels, 2 * out_channels)
         
-        self.init_weights()
-    
     def forward(self, x, edge_index, edge_weight, batch=None):
-        x = F.relu(self.conv1(x, edge_index=edge_index, edge_weight=edge_weight))
-        x = F.relu(self.conv2(x, edge_index=edge_index, edge_weight=edge_weight))
+        x = self.conv1(x, edge_index=edge_index, edge_weight=edge_weight)
+        nan_mask = torch.isnan(x)
+        # Generate random values from a normal distribution
+        replacement_values = torch.randn_like(x)
+        # Replace NaN values with random values
+        x[nan_mask] = replacement_values[nan_mask]
+        x = F.relu(x)
+        x = self.conv2(x, edge_index=edge_index, edge_weight=edge_weight)
+        nan_mask = torch.isnan(x)
+        # Generate random values from a normal distribution
+        replacement_values = torch.randn_like(x)
+        # Replace NaN values with random values
+        x[nan_mask] = replacement_values[nan_mask]
+        x = F.relu(x)
         return x, global_mean_pool(x, batch)
     
     def encode(self, graph, edge_index, edge_attr, **kwargs):
         return self.forward(graph, edge_index, edge_attr, kwargs.batch)
          
-    def init_weights(self):
+    """def init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
                 nn.init.kaiming_normal_(m.weight,
@@ -64,7 +74,7 @@ class GCNEncoder(nn.Module, Encoder):
             elif isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight, 0, 0.01)
                 if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
+                    nn.init.constant_(m.bias, 0)"""
                     
     def set_training(self, training):
         self.training = training

@@ -214,7 +214,7 @@ class ExplainerFactory:
                 converter = CF2TreeCycleConverter(feature_dim=feature_dim)
             else:
                 converter = DefaultFeatureAndWeightConverter(feature_dim=feature_dim,
-                                                              weight_dim=n_nodes)
+                                                              weight_dim=weight_dim)
                  
             return self.get_cff_explainer(n_nodes, converter,
                                           batch_size_ratio, lr, weight_decay,

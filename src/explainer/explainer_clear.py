@@ -86,15 +86,15 @@ class CLEARExplainer(Explainer):
         self._fitted = False
                 
     def explain(self, instance, oracle: Oracle, dataset: Dataset):
-        try:
-            dataset = self.converter.convert(dataset)
-        except ValueError: # some instances cannot be converted
-            return [instance]
-        
         if(not self._fitted):
             self.fit(oracle, dataset, self.fold_id)
 
         instance = dataset.get_instance(instance.id)
+        new_dataset = Dataset(id="dummy")
+        new_dataset.instances.append(instance)
+        new_dataset = self.converter.convert(new_dataset)
+        instance = new_dataset.instances[-1]
+        
         self.explainer.eval()
         
         with torch.no_grad():
@@ -103,21 +103,24 @@ class CLEARExplainer(Explainer):
             u = torch.from_numpy(np.array(instance.causality)).float().to(self.device)[None,:]
             labels = torch.from_numpy(np.array([instance.graph_label])).to(self.device)[None,:]
             
-            model_return = self.explainer(features, u, adj, labels)
-            adj_reconst, features_reconst = model_return['adj_reconst'], model_return['features_reconst']
-            
-            counterfactuals: List[DataInstanceWFeatures] = []
-            for _ in range(self.k):
-                adj_reconst_binary = torch.bernoulli(adj_reconst.squeeze())
+            try:
+                model_return = self.explainer(features, u, adj, labels)
+                adj_reconst, features_reconst = model_return['adj_reconst'], model_return['features_reconst']
                 
-                cf_instance = DataInstanceWFeatures(instance.id)
-                cf_instance.from_numpy_array(adj_reconst_binary.detach().numpy())
-                cf_instance.features = features_reconst.squeeze().detach().numpy()
+                counterfactuals: List[DataInstanceWFeatures] = []
+                for _ in range(self.k):
+                    adj_reconst_binary = torch.bernoulli(adj_reconst.squeeze())
+                    
+                    cf_instance = DataInstanceWFeatures(instance.id)
+                    cf_instance.from_numpy_array(adj_reconst_binary.detach().numpy())
+                    cf_instance.features = features_reconst.squeeze().detach().numpy()
+                    
+                    counterfactuals.append(cf_instance)
                 
-                counterfactuals.append(cf_instance)
-            
-            print(f'Finished evaluating for instance {instance.id}')
-            return counterfactuals
+                print(f'Finished evaluating for instance {instance.id}')
+                return counterfactuals
+            except: # there's a mismatch on the tensor shapes on what CLEAR was trained and the current instance
+                return [instance]
 
     def save_explainers(self):
         torch.save(self.explainer.state_dict(),
@@ -128,6 +131,7 @@ class CLEARExplainer(Explainer):
             os.path.join(self.explainer_store_path, self.name, f'explainer')))
 
     def fit(self, oracle: Oracle, dataset : Dataset, fold_id=0):
+        dataset = self.converter.convert(dataset)
         explainer_name = 'clear_fit_on_' + dataset.name + '_fold_id_' + str(fold_id)
         explainer_uri = os.path.join(self.explainer_store_path, explainer_name)
         self.name = explainer_name
@@ -250,8 +254,8 @@ class CLEARExplainer(Explainer):
         return F.binary_cross_entropy(adj_2_prob, adj_1)
     
     def transform_data(self, dataset: Dataset, fold_id=0):             
-        X_adj  = np.array([i.to_numpy_array() for i in dataset.instances])
-        X_features = np.array([i.features for i in dataset.instances])
+        X_adj  = [i.to_numpy_array() for i in dataset.instances]
+        X_features = [i.features for i in dataset.instances]
         X_causality = np.array([i.causality for i in dataset.instances])
         y = np.array([i.graph_label for i in dataset.instances])[..., np.newaxis]
         
@@ -284,19 +288,18 @@ class CLEARExplainer(Explainer):
     def __pad(self, arr, is_adj=True):
         # pad the array to the highest number of nodes
         # Find the maximum number of columns (second dimension) among all matrices
-        max_cols = max(matrix.shape[0] for matrix in arr)
+        max_cols = max(len(matrix) for matrix in arr)
         # Initialize a new tensor to store the padded matrices
         if is_adj:
-            padded_tensor = np.zeros((arr.shape[0], max_cols, max_cols))
+            padded_tensor = np.zeros((len(arr), max_cols, max_cols))
         else:
-            padded_tensor = np.zeros((arr.shape[0], max_cols, arr[0].shape[-1]))
+            padded_tensor = np.zeros((len(arr), max_cols, arr[0].shape[-1]))
         # Pad each matrix in the tensor
-        for i in range(arr.shape[0]):
+        for i in range(len(arr)):
             rows, cols = arr[i].shape
             padded_tensor[i, :rows, :cols] = arr[i]
         padded_tensor = padded_tensor.astype(np.float64)
         return padded_tensor
-    
         
 class CLEAR(nn.Module):
 

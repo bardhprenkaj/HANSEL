@@ -252,7 +252,7 @@ class GCounteRGANExplainer(Explainer):
     
 
     def transform_data(self, dataset: Dataset, fold_id=0, class_to_explain=0):
-        X  = np.array([i.to_numpy_array() for i in dataset.instances])
+        X  = [i.to_numpy_array() for i in dataset.instances]
         y = np.array([i.graph_label for i in dataset.instances])
         
         X, self.n_nodes = self.__pad_matrices(X)

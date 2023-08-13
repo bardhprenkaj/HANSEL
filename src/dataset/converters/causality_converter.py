@@ -37,7 +37,7 @@ class DefaultCausalityConverter(ConverterAB):
         u = int(gen_causality)
         noise_1 = (max_1[u] - min_1[u]) * np.random.random_sample() + min_1[u]
         feat_x1 = noise_1 + 0.5 * np.mean(instance.node_degrees())
-        feat_add = feat_x1.repeat(instance.graph.number_of_nodes()).reshape(-1,1)
+        feat_add = feat_x1.repeat(converted_instance.features.shape[0]).reshape(-1,1)
         
         self.u_dim = len(np.unique(self.data_causality_dims))
                 

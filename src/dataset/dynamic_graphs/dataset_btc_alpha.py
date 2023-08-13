@@ -5,7 +5,9 @@ from src.dataset.dynamic_graphs.dataset_dynamic import DynamicDataset
 import networkx as nx
 import numpy as np
 import os
+import random
 import pandas as pd
+import itertools
 from typing import Dict
 
 
@@ -24,7 +26,7 @@ class BTCAlpha(DynamicDataset):
         self.name = 'btc_alpha'   
         self.filter_min_graphs = filter_min_graphs
         self.number_of_communities = number_of_communities         
-        
+    
     def read_csv_file(self, dataset_path):
         # read the number of vertices in for each simplex
         ratings = pd.read_csv(os.path.join(dataset_path, 'real_bitcoin_alpha_user.txt'), sep='\t')
@@ -55,7 +57,8 @@ class BTCAlpha(DynamicDataset):
                 
             # year -> entire graph of coauthor simplices
             self.unprocessed_data[year] = G
-        
+            it += 1
+            
         self.preprocess_datasets()
                 
                 
@@ -75,14 +78,13 @@ class BTCAlpha(DynamicDataset):
         
         for t in range(max(self.begin_t, min(temporal_graph.keys())), min(self.end_t, max(temporal_graph.keys()))+1):
             instance_id = 0
-            weights_at_t = np.array(list(nx.get_edge_attributes(temporal_graph[t], 'weight').values()))
-            if np.sum(weights_at_t < 0):
-                communities = nx.community.greedy_modularity_communities(temporal_graph[t], weight='weight')
-                for community in communities:
-                    subgraph = temporal_graph[t].subgraph(list(community))
-                    self.__create_data_instance(id=instance_id, graph=subgraph,
-                                                year=t, label=self.__get_label(subgraph))
-                    instance_id += 1                      
+            nodes = list(temporal_graph[t].nodes)
+            for node in nodes[:int(len(nodes) * .2)]:
+                subgraph = nx.ego_graph(temporal_graph[t], node, undirected=True)
+                print(subgraph)
+                self.__create_data_instance(id=instance_id, graph=subgraph,
+                                            year=t, label=self.__get_label(subgraph))
+                instance_id += 1                      
     
     def __create_data_instance(self, id: int, graph: nx.Graph, year: int, label: float):
         instance = DataInstance(id=id)
@@ -93,9 +95,9 @@ class BTCAlpha(DynamicDataset):
         print(f'Adding DataInstance with id = {id} @year={year} with label = {label}')
         self.dynamic_graph[year].instances.append(instance)
     
-    def __get_label(self, graph: nx.Graph) -> Dict[int, int]:      
+    def __get_label(self, graph: nx.Graph) -> Dict[int, int]:
         ratings = np.array(list(nx.get_edge_attributes(graph, 'weight').values()))
-        return 1 if np.sum(ratings < 0) else 0            
+        return 1 if np.sum(ratings < 0) > np.sum(ratings >= 0) else 0      
 
     def __generate_node_features(self, instance: DataInstance) -> DataInstanceWFeaturesAndWeights:
         graph = instance.graph

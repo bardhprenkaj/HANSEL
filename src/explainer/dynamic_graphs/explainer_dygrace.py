@@ -305,6 +305,7 @@ class DyGRACE(Explainer):
                 curr_row['y'] = cls
                 curr_row['tuple'] = indices
                 rows.append(curr_row)
+                print(rows)
                 
         return rows
             
@@ -435,8 +436,7 @@ class DyGRACE(Explainer):
                 optimiser.zero_grad()
 
                 z, _ = self.autoencoders[cls].encode(x, edge_index=edge_index, edge_weight=edge_weight, batch=item.batch)
-                rec_adj = self.autoencoders[cls].decoder.forward_all(z)
-                loss = self.autoencoders[cls].loss(rec_adj, truth)
+                loss = self.autoencoders[cls].loss(z, truth)
                 if maximise:
                     loss = (1 / loss * self.EPS)               
                 loss.backward()

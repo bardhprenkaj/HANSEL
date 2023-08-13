@@ -1,0 +1,56 @@
+{
+    "store_paths": [
+        {"name": "dataset_store_path", "address": "./data/datasets/"},
+        {"name": "embedder_store_path", "address": "./data/embedders/"},
+        {"name": "oracle_store_path", "address": "./data/oracles/"},
+        {"name": "explainer_store_path", "address": "./data/explainers/BTC/countergan"},
+        {"name": "output_store_path", "address": "./output/BTC"}
+    ],
+    "datasets": [
+        {
+            "name": "btc_alpha", 
+            "parameters": {
+                "begin_time": 2010,
+                "end_time": 2010,
+                "filter_min_graphs": 4,
+                "number_of_communities": 4
+            } 
+        }
+    ],
+    "oracles": [
+        {
+            "name": "dynamic_oracle",
+            "parameters": {
+                "base_oracle" : {
+                    "name": "btc_alpha_oracle", 
+                    "parameters": {}
+                },
+                "first_train_timestamp": 2010
+            }
+        }
+    ],
+    "explainers": [
+        {
+            "name": "countergan",
+            "parameters": {
+                "n_nodes": 150,
+                "fold_id": 0,
+                "training_iterations": 250,
+                "n_discriminator_steps": 3,
+                "n_generator_steps": 2,
+                "n_labels": 2,
+                "ce_binarization_threshold": 0.5,
+                "device": "cpu",
+                "batch_size_ratio": 0.1
+            }
+        }
+    ],
+    "evaluation_metrics": [ 
+        {"name": "graph_edit_distance", "parameters": {}},
+        {"name": "oracle_calls", "parameters": {}},
+        {"name": "correctness", "parameters": {}},
+        {"name": "sparsity", "parameters": {}},
+        {"name": "fidelity", "parameters": {}},
+        {"name": "oracle_accuracy", "parameters": {}}
+    ]
+}

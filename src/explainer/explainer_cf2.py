@@ -50,24 +50,25 @@ class CF2Explainer(Explainer):
         self.fold_id = fold_id
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self._fitted = False
-
+        
         self.explainer = ExplainModelGraph(self.n_nodes).to(self.device)
         self.optimizer = torch.optim.Adam(
             self.explainer.parameters(), lr=self.lr, weight_decay=self.weight_decay
         )
+
         
     def explain(self, instance: DataInstance, oracle: Oracle, dataset: Dataset):
+        if(not self._fitted):
+            self.fit(dataset, oracle)
+
+        self.explainer.eval()
+        new_dataset = Dataset(id='dummy')
+        new_dataset.instances.append(instance)
+        new_dataset = self.converter.convert(new_dataset)
+        features_and_weight_instance = new_dataset.instances[-1]
+        
         try:
-            dataset = self.converter.convert(dataset)
-
-            if(not self._fitted):
-                self.explainer.train()
-                self.fit(dataset, oracle)
-
-            self.explainer.eval()
-            
             with torch.no_grad():
-                features_and_weight_instance = dataset.get_instance(instance.id)
                 adj = features_and_weight_instance.to_numpy_array()
                 weights = features_and_weight_instance.weights
                 features = features_and_weight_instance.features
@@ -89,6 +90,7 @@ class CF2Explainer(Explainer):
                 return [cf_instance]
         except:
             return [instance]
+        
 
     def save_explainers(self):
         torch.save(
@@ -114,8 +116,11 @@ class CF2Explainer(Explainer):
             os.mkdir(explainer_uri)
             self.__fit(dataset, oracle)
             self.save_explainers()
-
+        self._fitted = True
+        
     def __fit(self, dataset: Dataset, oracle: Oracle):
+        if self.converter:
+            dataset = self.converter.convert(dataset)
         graphs, labels = self.transform_data(dataset)
         
         self.explainer.train()
@@ -142,16 +147,38 @@ class CF2Explainer(Explainer):
         self._fitted = True
 
     def transform_data(self, dataset: Dataset):
-        adj  = np.array([i.to_numpy_array() for i in dataset.instances])
-        features = np.array([i.features for i in dataset.instances])
-        weights = np.array([i.weights for i in dataset.instances])
-        y = np.array([i.graph_label for i in dataset.instances])
-        
+        adj  = np.array([i.to_numpy_array() for i in dataset.instances], dtype=object)
+        features = np.array([i.features for i in dataset.instances], dtype=object)
+        weights = np.array([i.weights for i in dataset.instances], dtype=object)
+        y = np.array([i.graph_label for i in dataset.instances], dtype=np.float32)[..., np.newaxis]
+        """# adj.shape = n x n
+        adj = self.__pad(adj)
+        # feature.shape = n x n
+        features = self.__pad(features)
+        # weights.shape = n x n
+        weights = self.__pad(weights, is_adj=False)"""
+
         indices = dataset.get_split_indices()[self.fold_id]['train'] 
         adj, features, weights, y = adj[indices], features[indices], weights[indices], y[indices]
         dgl_dataset = CustomDGLDataset(adj, features, weights, y)
-
+        
         return dgl_dataset.graphs, dgl_dataset.labels
+    
+    def __pad(self, arr, is_adj=True):
+        # pad the array to the highest number of nodes
+        # Find the maximum number of columns (second dimension) among all matrices
+        max_cols = max(len(matrix) for matrix in arr)
+        # Initialize a new tensor to store the padded matrices
+        if is_adj:
+            padded_tensor = np.zeros((len(arr), max_cols, max_cols))
+        else:
+            padded_tensor = np.zeros((len(arr), max_cols, arr.shape[-1]))
+        # Pad each matrix in the tensor
+        for i in range(len(arr)):
+            rows, cols = arr[i].shape
+            padded_tensor[i, :rows, :cols] = arr[i]
+        padded_tensor = padded_tensor.astype(np.float64)
+        return padded_tensor
 
 class ExplainModelGraph(torch.nn.Module):
     

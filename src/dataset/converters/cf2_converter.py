@@ -17,8 +17,8 @@ class CF2TreeCycleConverter(DefaultFeatureAndWeightConverter):
         self.feature_dim = feature_dim
         
     def convert_instance(self, instance: DataInstance) -> DataInstanceWFeaturesAndWeights:
-        converted_instance = super().convert_instance(instance)
-        weights, features, adj_matrix = self.__preprocess(converted_instance)
+        converted_instance = DataInstanceWFeaturesAndWeights(instance.id)
+        weights, features, adj_matrix = self.__preprocess(instance)
         converted_instance.weights = weights
         converted_instance.features = features
         converted_instance.from_numpy_array(adj_matrix)
