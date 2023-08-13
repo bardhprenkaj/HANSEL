@@ -7,6 +7,7 @@ import torch.nn as nn
 from torch import Tensor
 from torch_geometric.nn import GAE, VGAE
 from torch_geometric.utils import negative_sampling
+from torch_geometric.nn.pool import global_mean_pool
 
 
 from src.utils.losses import SupervisedContrastiveLoss
@@ -29,6 +30,7 @@ class CustomGAE(GAE, AutoEncoder):
         rec_adj_matrix = self.decoder.forward_all(z, sigmoid=False)
         return self.mse(rec_adj_matrix, truth)
     
+    
 class CustomVGAE(VGAE, AutoEncoder):
     
     def __init__(self, encoder: nn.Module,
@@ -47,6 +49,22 @@ class CustomVGAE(VGAE, AutoEncoder):
         
         self.mse = nn.MSELoss()
         
+    def encode(self, *args, **kwargs) -> Tensor:
+        self.__mu__, self.__logstd__ = self.encoder(*args, **kwargs)
+        self.__logstd__ = self.__logstd__.clamp(max=1e+7)
+        self.__logstd__[torch.isnan(self.__logstd__)] = .1
+        self.__mu__[torch.isnan(self.__mu__)] = 1
+        z = self.reparametrize(self.__mu__, self.__logstd__)
+        return z
+    
+    def kl_loss(self, mu: Optional[Tensor] = None,
+                logstd: Optional[Tensor] = None) -> Tensor:
+        mu = self.__mu__ if mu is None else mu
+        logstd = self.__logstd__ if logstd is None else logstd.clamp(max=1e+7)
+        logstd[torch.isnan(logstd)] = .1
+        mu[torch.isnan(mu)] = 1
+        return -0.5 * torch.mean(torch.sum(1 + 2 * logstd - mu**2 - logstd.exp()**2, dim=1))
+        
     def recon_loss(self, z: Tensor,
                    pos_edge_index: Tensor,
                    neg_edge_index: Optional[Tensor] = None,
@@ -55,16 +73,14 @@ class CustomVGAE(VGAE, AutoEncoder):
         num_edges = len(pos_edge_index)
         # if the input graph is not complete
         pos_loss = -torch.log(self.decoder.decode(z, pos_edge_index, **{'edge_attr': edge_attr, 'sigmoid': True}) + 1e-15).mean()
-
         neg_loss = 0
         if num_edges != (num_nodes * (num_nodes - 1)):
             if neg_edge_index is None:
                 neg_edge_index = negative_sampling(pos_edge_index, z.size(0))
             neg_loss = -torch.log(1 - self.decoder.decode(z, neg_edge_index, **{'edge_attr': None,'sigmoid': True}) + 1e-15).mean()
-
         return pos_loss + neg_loss
  
-    def loss(self, z: Tensor, truth, **kwargs):   
+    def loss(self, z: Tensor, truth, **kwargs): 
         return self.recon_loss(z, truth, **kwargs) + (1/z.shape[0]) * self.kl_loss()
     
     def encoding_mask_noise(self, x, mask_rate=.3):
@@ -101,6 +117,8 @@ class CustomVGAE(VGAE, AutoEncoder):
         use_x, mask_nodes, _ = self.encoding_mask_noise(x, self.mask_rate)
         # encode the x
         z = self.encode(use_x, edge_index, edge_attr)
+        # non-existing directed edges make everything be nan
+        z[torch.isnan(z)] = -1e-4        
         # align the encoder latent space with the decoder's input space
         repr = self.encoder_to_decoder(z)
         repr[mask_nodes] = 0
