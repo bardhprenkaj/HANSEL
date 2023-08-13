@@ -233,19 +233,22 @@ class GCounteRGANExplainer(Explainer):
             countergan.set_training_discriminator(False)
             countergan.discriminator.train(False)
             
-            for _ in range(self.n_generator_steps):
-                graph, _ = next(generator_loader)
-                graph = graph[:,None,:,:]
-                graph = graph.to(self.device)
-                y_fake = torch.ones((self.generator_batch, ))
-                
-                output = countergan(graph)
-                
-                loss = loss_countergan(output.squeeze(), y_fake.float())
+            try:
+                for _ in range(self.n_generator_steps):
+                    graph, _ = next(generator_loader)
+                    graph = graph[:,None,:,:]
+                    graph = graph.to(self.device)
+                    y_fake = torch.ones((self.generator_batch, ))
                     
-                loss.backward()
-                G_losses.append(loss.item())
-                countergan_optimizer.step()
+                    output = countergan(graph)
+                    
+                    loss = loss_countergan(output.squeeze(), y_fake.float())
+                        
+                    loss.backward()
+                    G_losses.append(loss.item())
+                    countergan_optimizer.step()
+            except:
+                print("No loss updated for the generator")
                 
             print(f'Iteration [{iteration}/{self.training_iterations}]'\
                 +f'\tLoss_D: {np.mean(D_losses)}\tLoss_G: {np.mean(G_losses)}')
