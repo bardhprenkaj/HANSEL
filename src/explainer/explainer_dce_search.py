@@ -2,7 +2,7 @@ from src.evaluation.evaluation_metric_base import EvaluationMetric
 from src.explainer.explainer_base import Explainer
 from src.dataset.dataset_base import Dataset
 from src.oracle.oracle_base import Oracle
-
+import numpy as np
 import sys
 
 class DCESearchExplainer(Explainer):
@@ -29,13 +29,13 @@ class DCESearchExplainer(Explainer):
             l_data_inst = oracle.predict(d_inst)
 
             if (l_input_inst != l_data_inst):
-                d_inst_dist = self._gd.evaluate(instance, d_inst, oracle)
+                d_inst_dist = self._gd.evaluate(instance, [d_inst], oracle)
 
-                if (d_inst_dist < min_counterfactual_dist):
-                    min_counterfactual_dist = d_inst_dist
+                if (np.min(d_inst_dist) < min_counterfactual_dist):
+                    min_counterfactual_dist = np.min(d_inst_dist)
                     min_counterfactual = d_inst
         
-        return min_counterfactual
+        return [min_counterfactual]
 
 
 class DCESearchExplainerOracleless(Explainer):

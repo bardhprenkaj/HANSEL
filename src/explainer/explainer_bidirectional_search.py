@@ -125,7 +125,7 @@ class ObliviousBidirectionalSearchExplainer(BidirectionalHeuristicExplainerBase)
         # Converting the final counterfactual into a DataInstance
         result = DataInstance(-1)
         result.from_numpy_array(final_counterfactual)
-        return result
+        return [result]
 
     
     
@@ -298,7 +298,7 @@ class DataDrivenBidirectionalSearchExplainer(BidirectionalHeuristicExplainerBase
 
         result = DataInstance(-1)
         result.from_numpy_array(final_counterfactual)
-        return result
+        return [result]
 
 
     def data_driven_forward_search(self, instance : DataInstance, oracle: Oracle, dataset: Dataset) -> DataInstance:
@@ -315,7 +315,7 @@ class DataDrivenBidirectionalSearchExplainer(BidirectionalHeuristicExplainerBase
 
         result = DataInstance(-1)
         result.from_numpy_array(counterfactual)
-        return result
+        return [result]
 
 
     def data_driven_forward_search2(self, instance : DataInstance, oracle: Oracle, dataset: Dataset) -> DataInstance:
@@ -348,7 +348,7 @@ class DataDrivenBidirectionalSearchExplainer(BidirectionalHeuristicExplainerBase
 
         result = DataInstance(-1)
         result.from_numpy_array(final_counterfactual)
-        return result
+        return [result]
 
     # End> Made by us ///////////////////////////////////////////////////////////////////////////////////////
 
@@ -382,12 +382,13 @@ class DataDrivenBidirectionalSearchExplainer(BidirectionalHeuristicExplainerBase
             g = inst.to_numpy_array()
             y_hat = oracle.predict(inst)
             if y_hat==0:
+                g_0, g = self.pad_matrices(g_0, g)
                 g_0 = np.add(g_0,g)
             else:
-                print("here", g)
-                print("here2", g_1)
+                g_1, g = self.pad_matrices(g_1, g)
                 g_1 = np.add(g_1,g)
 
+        g_0, g_1 = self.pad_matrices(g_0, g_1)
         # //////////////////////////////////////////////////
 
         g_01 = g_0-g_1
@@ -395,15 +396,15 @@ class DataDrivenBidirectionalSearchExplainer(BidirectionalHeuristicExplainerBase
 
         min_01 = g_01.min()
         max_01 = g_01.max()
-        g01 = np.ones((dim_g,dim_g))+(g_01-min_01)/(max_01-min_01)
+        g01 = np.ones((g_0.shape[0],g_0.shape[0]))+(g_01-min_01)/(max_01-min_01)
 
         min_10 = g_10.min()
         max_10 = g_10.max()
-        g10 = np.ones((dim_g,dim_g))+(g_10-min_10)/(max_10-min_10)
+        g10 = np.ones((g_0.shape[0],g_0.shape[0]))+(g_10-min_10)/(max_10-min_10)
 
         prob_initial = {0:g01/g01.sum(),1:g10/g10.sum()}
 
-        g00 = np.ones((dim_g,dim_g))
+        g00 = np.ones((g_0.shape[0],g_0.shape[0]))
         uniform_initial_prop = {0:g00/g00.sum(),1:g00/g00.sum()}
 
         # Added code ///////////////////////////////////////////
@@ -411,7 +412,17 @@ class DataDrivenBidirectionalSearchExplainer(BidirectionalHeuristicExplainerBase
         # d_final,g_c_final,lambda_final = DFS(g,y_bar,prob_initial)
         return prob_initial
 
+    def pad_matrices(self, matrix1, matrix2):
+        max_size = max(matrix1.shape[0], matrix1.shape[1], matrix2.shape[0], matrix2.shape[1])
+        padded_matrix1 = np.zeros((max_size, max_size))
+        padded_matrix2 = np.zeros((max_size, max_size))
+        
+        padded_matrix1[:matrix1.shape[0], :matrix1.shape[1]] = matrix1
+        padded_matrix2[:matrix2.shape[0], :matrix2.shape[1]] = matrix2
 
+        return padded_matrix1, padded_matrix2
+
+        
     def DFS_select(self, g,edges, y_bar, ki, edges_prob, p_0=0.5):
         '''
         '''
@@ -435,21 +446,24 @@ class DataDrivenBidirectionalSearchExplainer(BidirectionalHeuristicExplainerBase
         #print('-- ',len(edges_rem),len(edges_add),len(edges))
         edges_i = []
         kii=0
-        while(kii<ki):
-            kii+=1
-            if self._bernoulli(p_0) and len(edges_add)>0:
-                #add
-                n = np.random.choice(range(len(edges_add)), size=1, p=edges_prob_add)[0]
-                i,j = edges_add[n]
-                g[i][j]=1
-                g[j][i]=1
-            elif len(edges_rem)>0:
-                #remove
-                n = np.random.choice(range(len(edges_rem)), size=1, p=edges_prob_rem)[0]
-                i,j = edges_rem[n]
-                g[i][j]=0
-                g[j][i]=0
-            edges.append((i,j))
+        try:
+            while(kii<ki):
+                kii+=1
+                if self._bernoulli(p_0) and len(edges_add)>0:
+                    #add
+                    n = np.random.choice(range(len(edges_add)), size=1, p=edges_prob_add)[0]
+                    i,j = edges_add[n]
+                    g[i][j]=1
+                    g[j][i]=1
+                elif len(edges_rem)>0:
+                    #remove
+                    n = np.random.choice(range(len(edges_rem)), size=1, p=edges_prob_rem)[0]
+                    i,j = edges_rem[n]
+                    g[i][j]=0
+                    g[j][i]=0
+                edges.append((i,j))
+        except UnboundLocalError:
+            return g, edges
         return g,edges
 
 

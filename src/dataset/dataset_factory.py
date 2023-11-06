@@ -1,5 +1,6 @@
 import os
 import shutil
+import numpy as np
 
 from src.dataset.dataset_adhd import ADHDDataset
 from src.dataset.dataset_asd import ASDDataset
@@ -13,6 +14,7 @@ from src.dataset.dataset_trisqr import TrianglesSquaresDataset
 from src.dataset.dynamic_graphs.dataset_btc_alpha import BTCAlpha
 from src.dataset.dynamic_graphs.dataset_coauthorship_dblp import \
     CoAuthorshipDBLP
+from src.dataset.dynamic_graphs.dataset_dynamic import DynamicDataset
 from src.dataset.dynamic_graphs.dynamic_tree_cycles import DynTreeCycles
 
 
@@ -151,6 +153,7 @@ class DatasetFactory():
             sampling_ratio = params_dict.get('sampling_ratio', .05)
             min_nodes_per_egonet = params_dict.get('min_nodes_per_egonet', 3)
             features_dim = params_dict.get('features_dim', 8)
+            padd = params_dict.get('padd', False)
         
             return self.get_coauthorship_dblp(begin_time,
                                               end_time,
@@ -158,7 +161,8 @@ class DatasetFactory():
                                               min_nodes_per_egonet,
                                               sampling_ratio,
                                               features_dim,
-                                              dataset_dict)
+                                              dataset_dict,
+                                              padd=padd)
             
         elif dataset_name == 'dynamic_tree_cycles':
             if not 'begin_time' in params_dict:
@@ -262,7 +266,8 @@ class DatasetFactory():
                               min_nodes_per_egonet=3,
                               sampling_ratio=.05, 
                               features_dim=8,
-                              dataset_dict=None):
+                              dataset_dict=None,
+                              padd=False):
         
         result = CoAuthorshipDBLP(self._dataset_id_counter,
                                   begin_time=begin_time,
@@ -287,7 +292,28 @@ class DatasetFactory():
                                            n_splits=10, shuffle=True)
             result.write_datasets(ds_uri)
             
+        if padd:
+            max_nodes = max([instance.graph.number_of_nodes() for graph in result.dynamic_graph.values() for instance in graph.instances ])
+            result = self.pad_matrices(result, max_nodes)
+
         return result
+    
+    
+    def pad_matrices(self, dataset: DynamicDataset, dim: int):
+        import copy
+        new_dataset = copy.deepcopy(dataset)
+        for key, graph in dataset.dynamic_graph.items():
+            instances = []
+            for instance in graph.instances:
+                padded_matrix = np.zeros((dim, dim))
+                adj_matrix = instance.to_numpy_array(store=False)
+                padded_matrix[:adj_matrix.shape[0], :adj_matrix.shape[1]] = adj_matrix
+                instance.from_numpy_array(padded_matrix, store=True)
+                instances.append(instance)
+            graph.instances = instances
+            new_dataset.dynamic_graph[key] = graph
+        return new_dataset
+
 
     def get_imbd(self, self_loops=False, config_dict=None):
         result = IMDBDataset(self._dataset_id_counter, self_loops=self_loops, config_dict=config_dict)

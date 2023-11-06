@@ -73,7 +73,6 @@ class MEGExplainer(Explainer):
     def fit(self, oracle: Oracle, dataset : Dataset, instance: DataInstance, fold_id=0):
         explainer_name = f'meg_fit_on_{dataset.name}_instance={instance.id}_fold_id={fold_id}'
         self.name = explainer_name
-                
         self.cf_queue = SortedQueue(self.num_counterfactuals, sort_predicate=self.sort_predicate)
         self.environment.set_instance(instance)
         self.environment.oracle = oracle
@@ -89,7 +88,7 @@ class MEGExplainer(Explainer):
         while episode < self.num_epochs:
             steps_left = self.max_steps_per_episode - self.environment.num_steps_taken
             valid_actions = list(self.environment.get_valid_actions())
-                        
+                                    
             observations = np.vstack(
                 [
                     np.append(self.action_encoder.encode(action), steps_left) for action in valid_actions
@@ -110,13 +109,11 @@ class MEGExplainer(Explainer):
             next_state, out, done = result
             
             steps_left = self.max_steps_per_episode - self.environment.num_steps_taken
-            
             action_embeddings = np.vstack(
                 [
                     np.append(self.action_encoder.encode(action), steps_left) for action in self.environment.get_valid_actions()
                 ]
             )
-            
             self.explainer.replay_buffer.push(
                 torch.as_tensor(action_embedding).float(),
                 torch.as_tensor(out['reward']).float(),
@@ -191,7 +188,6 @@ class MEGAgent:
         experience = self.replay_buffer.sample(batch_size)
         states_ = torch.stack([S for S, *_ in experience])        
         next_states_ = [S for *_, S, _ in experience]
-        
         q = self.dqn(states_)
         q_target = torch.stack([self.target_dqn(S).max(dim=0).values.detach() for S in next_states_])
         

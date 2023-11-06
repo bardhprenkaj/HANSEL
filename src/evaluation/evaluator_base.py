@@ -122,13 +122,13 @@ class Evaluator(ABC):
         fold_id = self._explainer.fold_id
         if fold_id == -1:
             for inst in self._data.instances:
-                
+                                
                 start_time = time.time()
                 counterfactuals: List[DataInstance] = self._explainer.explain(inst, self._oracle, self._data)
                 end_time = time.time()
                 # giving the same id to the counterfactual and the original instance
-                for i in range(len(counterfactuals)):
-                    counterfactuals[i].id = inst.id 
+                """for i in range(len(counterfactuals)):
+                    counterfactuals[i].id = inst.id"""
 
                 self._explanations += counterfactuals
 
@@ -143,7 +143,7 @@ class Evaluator(ABC):
             print(f'The length of the test set is = {len(test_set)}')
 
             for inst in test_set:
-                
+                                
                 start_time = time.time()
                 counterfactuals: List[DataInstance] = self._explainer.explain(inst, self._oracle, self._data)
                 end_time = time.time()

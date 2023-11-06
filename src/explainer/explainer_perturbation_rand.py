@@ -6,7 +6,7 @@ from src.dataset.data_instance_base import DataInstance
 from src.dataset.dataset_base import Dataset
 from src.explainer.explainer_base import Explainer
 from src.oracle.oracle_base import Oracle
-
+import copy
 
 class PerturbationRandExplainer(Explainer):
     
@@ -38,14 +38,18 @@ class PerturbationRandExplainer(Explainer):
         
         sample_index = np.random.choice(list(range(len(new_edges))),
                                          size=int(len(new_edges) * self.perturbation_percentage))
+        try:
+            sampled_edges = new_edges[sample_index]
+            
+            new_adj_matrix = copy.deepcopy(adj_matrix)
+            # switch on/off the sampled edges
+            new_adj_matrix[sampled_edges[:,0], sampled_edges[:,1]] = 1 - new_adj_matrix[sampled_edges[:,0], sampled_edges[:,1]]
+            new_adj_matrix[sampled_edges[:,1], sampled_edges[:,0]] = new_adj_matrix[sampled_edges[:,0], sampled_edges[:,1]]
         
-        sampled_edges = new_edges[sample_index]
-        # switch on/off the sampled edges
-        adj_matrix[sampled_edges[:,0], sampled_edges[:,1]] = 1 - adj_matrix[sampled_edges[:,0], sampled_edges[:,1]]
-        adj_matrix[sampled_edges[:,1], sampled_edges[:,0]] = 1 - adj_matrix[sampled_edges[:,1], sampled_edges[:,0]]
-    
-        # build the instance
-        cf_instance = DataInstance(instance.id)
-        cf_instance.from_numpy_array(adj_matrix)
-        return cf_instance
+            # build the instance
+            cf_instance = DataInstance(instance.id)
+            cf_instance.from_numpy_array(new_adj_matrix)
+            return [cf_instance]
+        except IndexError:
+            return [instance]
     
