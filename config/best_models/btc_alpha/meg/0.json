@@ -13,7 +13,8 @@
                 "begin_time": 2010,
                 "end_time": 2010,
                 "filter_min_graphs": 4,
-                "number_of_communities": 4
+                "number_of_communities": 4,
+                "padd": true
             } 
         }
     ],

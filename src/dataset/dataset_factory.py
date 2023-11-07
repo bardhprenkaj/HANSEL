@@ -194,6 +194,8 @@ class DatasetFactory():
             
             begin_time = params_dict['begin_time']
             end_time = params_dict['end_time']
+            padd = params_dict.get('padd', False)
+
             
             assert (begin_time <= end_time)
             
@@ -201,7 +203,8 @@ class DatasetFactory():
             
             return self.get_btc_alpha(begin_time=begin_time,
                                       end_time=end_time,
-                                      filter_min_graphs=filter_min_graphs)
+                                      filter_min_graphs=filter_min_graphs,
+                                      padd=padd)
         
         # If the dataset name does not match any of the datasets provided by the factory
         else:
@@ -209,7 +212,7 @@ class DatasetFactory():
              tree-cycles-balanced, tree-cycles-dummy''')
             
             
-    def get_btc_alpha(self, begin_time, end_time, filter_min_graphs, dataset_dict=None):
+    def get_btc_alpha(self, begin_time, end_time, filter_min_graphs, dataset_dict=None, padd=False):
         
         result = BTCAlpha(id=self._dataset_id_counter,
                           begin_t=begin_time,
@@ -229,6 +232,10 @@ class DatasetFactory():
             result.load_or_generate_splits(os.path.join(self._data_store_path, 'dynamic_graphs', ds_name),
                                            n_splits=10, shuffle=True)
             result.write_datasets(ds_uri)
+            
+        if padd:
+            max_nodes = max([instance.graph.number_of_nodes() for graph in result.dynamic_graph.values() for instance in graph.instances ])
+            result = self.pad_matrices(result, max_nodes)
             
         return result
     
