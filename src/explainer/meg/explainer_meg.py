@@ -51,18 +51,21 @@ class MEGExplainer(Explainer):
         self.k = k       
 
     def explain(self, instance, oracle: Oracle, dataset: Dataset):
-        #dataset = self.converter.convert(dataset)              
-        self.explainer = MEGAgent(num_input=self.num_input + 1,
-                                  num_output=1,
-                                  lr=self.lr,
-                                  replay_buffer_size=self.replay_buffer_size)
-        
-        self.fit(oracle, dataset, instance, self.fold_id)
-        instance = dataset.get_instance(instance.id)
-        
-        with torch.no_grad():
-            counterfactuals = self.cf_queue.slice(self.k)
-            return [cf_inst['next_state'] for cf_inst in counterfactuals]
+        #dataset = self.converter.convert(dataset)  
+        if self.iteration > 0:            
+            self.explainer = MEGAgent(num_input=instance.graph.number_of_nodes()*2 + 1,
+                                      num_output=1,
+                                      lr=self.lr,
+                                      replay_buffer_size=self.replay_buffer_size)
+            
+            self.fit(oracle, dataset, instance, self.fold_id)
+            instance = dataset.get_instance(instance.id)
+            
+            with torch.no_grad():
+                counterfactuals = self.cf_queue.slice(self.k)
+                return [cf_inst['next_state'] for cf_inst in counterfactuals]
+        else:
+            return [instance]
 
     def save_explainers(self):
         self.explainer.save(os.path.join(self.explainer_store_path, self.name))
