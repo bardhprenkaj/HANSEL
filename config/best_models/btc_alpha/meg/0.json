@@ -44,12 +44,14 @@
                     "name": "id"
                 },
                 "fold_id": 0,
-                "num_input": 784,
+                "num_input": 9604,
                 "epochs": 10,
                 "batch_size": 1,
                 "learning_rate": 1e-4,
                 "gamma": 0.95,
-                "polyak": 0.995
+                "polyak": 0.995,
+                "num_counterfactuals":1,
+                "top_k_cf":1
             } 
         }
     ],
