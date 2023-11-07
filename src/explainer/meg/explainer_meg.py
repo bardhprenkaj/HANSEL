@@ -53,10 +53,10 @@ class MEGExplainer(Explainer):
     def explain(self, instance, oracle: Oracle, dataset: Dataset):
         #dataset = self.converter.convert(dataset)  
         if self.iteration > 0:            
-            self.explainer = MEGAgent(num_input=instance.graph.number_of_nodes()*2 + 1,
-                                      num_output=1,
-                                      lr=self.lr,
-                                      replay_buffer_size=self.replay_buffer_size)
+            self.explainer = MEGAgent(num_input=self.num_input + 1,
+                                    num_output=1,
+                                    lr=self.lr,
+                                    replay_buffer_size=self.replay_buffer_size)
             
             self.fit(oracle, dataset, instance, self.fold_id)
             instance = dataset.get_instance(instance.id)
