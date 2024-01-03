@@ -8,7 +8,7 @@ import os
 import random
 import pandas as pd
 import itertools
-from typing import Dict
+from typing import Dict, List
 
 
 
@@ -20,16 +20,18 @@ class BTCAlpha(DynamicDataset):
                  end_t,
                  filter_min_graphs=10,
                  number_of_communities=15,
+                 padding=True,
                  config_dict=None) -> None:
         
         super().__init__(id, begin_t, end_t, config_dict)
         self.name = 'btc_alpha'   
         self.filter_min_graphs = filter_min_graphs
-        self.number_of_communities = number_of_communities         
+        self.number_of_communities = number_of_communities
+        self.padding = padding         
     
     def read_csv_file(self, dataset_path):
         # read the number of vertices in for each simplex
-        ratings = pd.read_csv(os.path.join(dataset_path, 'real_bitcoin_alpha_user.txt'), sep='\t')
+        ratings = pd.read_csv(os.path.join(dataset_path, 'network.txt'), sep='\t')
         ratings.columns=['source','target','time','rating','comment']
         
         print(ratings.head(10))
@@ -75,16 +77,41 @@ class BTCAlpha(DynamicDataset):
         print(f'Finished preprocessing.')
                 
     def __get_communities(self, temporal_graph):
-        
         for t in range(max(self.begin_t, min(temporal_graph.keys())), min(self.end_t, max(temporal_graph.keys()))+1):
             instance_id = 0
             nodes = list(temporal_graph[t].nodes)
             for node in nodes[:int(len(nodes) * .2)]:
                 subgraph = nx.ego_graph(temporal_graph[t], node, undirected=True)
-                print(subgraph)
                 self.__create_data_instance(id=instance_id, graph=subgraph,
                                             year=t, label=self.__get_label(subgraph))
-                instance_id += 1                      
+                instance_id += 1
+                
+        if self.padding:
+            self.__pad()
+            
+            
+    def __pad(self):
+        arrays = []
+        num_instances = {}
+        for year in self.dynamic_graph.keys():
+            num_instances[year] = len(self.dynamic_graph[year].instances)
+            for inst in self.dynamic_graph[year].instances:
+                arrays.append(inst.to_numpy_array(store=False))
+                
+        del num_instances[min(self.dynamic_graph.keys())]
+        max_dimension = max([arr.shape[0] for arr in arrays])
+        
+        # Pad each array to the highest dimension
+        padded_matrices = [np.pad(matrix, 
+                                  [(0, max_dimension - matrix.shape[0]), 
+                                   (0, max_dimension - matrix.shape[1])] if matrix.ndim == 2\
+                                       else [(0, max_dimension - matrix.shape[0])], mode='constant', constant_values=0)\
+                                           for matrix in arrays]
+        for key_num, year in enumerate(self.dynamic_graph.keys()):
+            for i, inst in enumerate(self.dynamic_graph[year].instances):
+                j = i + num_instances[year] if key_num > 0 else i
+                inst.from_numpy_array(padded_matrices[j], store=True)
+                self.dynamic_graph[year].instances[i] = inst   
     
     def __create_data_instance(self, id: int, graph: nx.Graph, year: int, label: float):
         instance = DataInstance(id=id)
@@ -97,7 +124,7 @@ class BTCAlpha(DynamicDataset):
     
     def __get_label(self, graph: nx.Graph) -> Dict[int, int]:
         ratings = np.array(list(nx.get_edge_attributes(graph, 'weight').values()))
-        return 1 if np.sum(ratings < 0) > np.sum(ratings >= 0) else 0      
+        return 1 if np.sum(ratings < 0) > np.log(np.sum(ratings >= 0)) else 0      
 
     def __generate_node_features(self, instance: DataInstance) -> DataInstanceWFeaturesAndWeights:
         graph = instance.graph

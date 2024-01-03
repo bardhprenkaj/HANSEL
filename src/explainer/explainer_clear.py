@@ -251,7 +251,7 @@ class CLEARExplainer(Explainer):
         return pdist(feat_1, feat_2) / 4
     
     def __distance_graph_prob(self, adj_1, adj_2_prob):
-        return F.binary_cross_entropy(adj_2_prob, adj_1)
+        return F.binary_cross_entropy(adj_2_prob, (adj_1 - torch.min(adj_1)) / (torch.max(adj_1) - torch.min(adj_1)))
     
     def transform_data(self, dataset: Dataset, fold_id=0):             
         X_adj  = [i.to_numpy_array() for i in dataset.instances]

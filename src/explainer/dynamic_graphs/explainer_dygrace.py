@@ -278,7 +278,7 @@ class DyGRACE(Explainer):
                 curr_row = {'tuple': [], 'y': -1, 'rec_cf': 0, 'rec_f': 1}
                 # set dummy reconstruction errors for all elements in the tuple
                 # set dummy similarity for all elements in the tuple
-                curr_row.change({f'sim_{i}': 0 for i in range(len(indices) - 1)})
+                curr_row.update({f'sim_{i}': 0 for i in range(len(indices) - 1)})
                 # for all the other instances in the tuple
                 # get the reconstruction errors (counterfactual and factual)
                 # and their similarity with the anchor
@@ -394,7 +394,10 @@ class DyGRACE(Explainer):
     def __expand(self, data: Data):
         x = data.x.squeeze(dim=0).to(self.device)
         edge_index = data.edge_index.squeeze(dim=0).to(self.device)
-        edge_weight = data.edge_attr.squeeze(dim=0).to(self.device)
+        if data.edge_attr.shape != (1,) :
+            edge_weight = data.edge_attr.squeeze(dim=0).to(self.device)
+        else:
+            edge_weight = data.edge_attr.to(self.device)
         label = data.y.squeeze(dim=0).to(self.device)
         
         truth = torch.zeros(size=(data.num_nodes, data.num_nodes)).double()

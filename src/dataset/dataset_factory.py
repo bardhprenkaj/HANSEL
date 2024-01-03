@@ -186,7 +186,7 @@ class DatasetFactory():
                                                 nodes_in_cycle=nodes_in_cycle,
                                                 dataset_dict=dataset_dict)
             
-        elif dataset_name == 'btc_alpha':
+        elif dataset_name in ['btc_alpha', 'btc_otc']:
             if not 'begin_time' in params_dict:
                 raise ValueError('"begin_time" is mandatory for CoAuthorshipDBLP')
             if not 'end_time' in params_dict:
@@ -201,10 +201,10 @@ class DatasetFactory():
             
             filter_min_graphs = params_dict.get('filter_min_graphs', 10)
             
-            return self.get_btc_alpha(begin_time=begin_time,
+            return self.get_btc(begin_time=begin_time,
                                       end_time=end_time,
                                       filter_min_graphs=filter_min_graphs,
-                                      padd=padd)
+                                      padd=padd, name=dataset_name)
         
         # If the dataset name does not match any of the datasets provided by the factory
         else:
@@ -212,7 +212,7 @@ class DatasetFactory():
              tree-cycles-balanced, tree-cycles-dummy''')
             
             
-    def get_btc_alpha(self, begin_time, end_time, filter_min_graphs, dataset_dict=None, padd=False):
+    def get_btc(self, begin_time, end_time, filter_min_graphs, dataset_dict=None, padd=False, name='btc_alpha'):
         
         result = BTCAlpha(id=self._dataset_id_counter,
                           begin_t=begin_time,
@@ -220,16 +220,15 @@ class DatasetFactory():
                           filter_min_graphs=filter_min_graphs,
                           config_dict=dataset_dict)
         self._dataset_id_counter += 1
-        ds_name = 'btc_alpha'
-        ds_uri = os.path.join(self._data_store_path, 'dynamic_graphs', ds_name, 'processed')
+        ds_uri = os.path.join(self._data_store_path, 'dynamic_graphs', name, 'processed')
         ds_exists = os.path.exists(ds_uri)
         
         if ds_exists:
             result.read_datasets(ds_uri)
         else:
-            result.read_csv_file(os.path.join(self._data_store_path, 'dynamic_graphs', ds_name))
+            result.read_csv_file(os.path.join(self._data_store_path, 'dynamic_graphs', name))
             result.build_temporal_graph()
-            result.load_or_generate_splits(os.path.join(self._data_store_path, 'dynamic_graphs', ds_name),
+            result.load_or_generate_splits(os.path.join(self._data_store_path, 'dynamic_graphs', name),
                                            n_splits=10, shuffle=True)
             result.write_datasets(ds_uri)
             
