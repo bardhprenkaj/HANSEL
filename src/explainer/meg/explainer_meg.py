@@ -50,9 +50,9 @@ class MEGExplainer(Explainer):
         self.lr = lr
         self.k = k       
 
-    def explain(self, instance, oracle: Oracle, dataset: Dataset):
-        #dataset = self.converter.convert(dataset)  
-        self.explainer = MEGAgent(num_input=self.num_input + 1,
+    def explain(self, instance: DataInstance, oracle: Oracle, dataset: Dataset):
+        num_input = len(instance.to_numpy_array()) ** 2
+        self.explainer = MEGAgent(num_input=num_input,
                                 num_output=1,
                                 lr=self.lr,
                                 replay_buffer_size=self.replay_buffer_size)
