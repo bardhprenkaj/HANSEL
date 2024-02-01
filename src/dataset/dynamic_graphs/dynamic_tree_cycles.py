@@ -18,7 +18,7 @@ class DynTreeCycles(DynamicDataset):
                  config_dict=None) -> None:
         super().__init__(id, begin_t, end_t, config_dict)
         
-        assert (begin_t < end_t)
+        assert (begin_t <= end_t)
         
         self._id = id
         self._name = 'dynamic_tree_cycles'

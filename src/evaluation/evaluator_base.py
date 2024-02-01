@@ -122,6 +122,7 @@ class Evaluator(ABC):
         fold_id = self._explainer.fold_id
         if fold_id == -1:
             for inst in self._data.instances:
+                print(inst)
                                 
                 start_time = time.time()
                 counterfactuals: List[DataInstance] = self._explainer.explain(inst, self._oracle, self._data)
@@ -130,7 +131,7 @@ class Evaluator(ABC):
                 """for i in range(len(counterfactuals)):
                     counterfactuals[i].id = inst.id"""
 
-                self._explanations += counterfactuals
+                self._explanations = counterfactuals
 
                 # The runtime metric is built-in inside the evaluator``
                 self._results.setdefault('runtime', []).append(end_time - start_time)
@@ -151,7 +152,7 @@ class Evaluator(ABC):
                 """for i in range(len(counterfactuals)):
                     counterfactuals[i].id = inst.id"""
                     
-                self._explanations.append(counterfactuals)
+                self._explanations = counterfactuals
 
                 # The runtime metric is built-in inside the evaluator``
                 self._results.setdefault('runtime', []).append(end_time - start_time)

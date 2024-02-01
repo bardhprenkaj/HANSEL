@@ -33,8 +33,6 @@ class BTCAlpha(DynamicDataset):
         # read the number of vertices in for each simplex
         ratings = pd.read_csv(os.path.join(dataset_path, 'network.txt'), sep='\t')
         ratings.columns=['source','target','time','rating','comment']
-        
-        print(ratings.head(10))
         ratings['year'] = ratings.time.apply(lambda x : pd.to_datetime(x).year)
         # retain only desired history
         ratings = ratings[(ratings.year >= self.begin_t) & (ratings.year <= self.end_t)]

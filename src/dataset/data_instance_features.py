@@ -13,11 +13,12 @@ class DataInstanceWFeatures(DataInstance):
                  node_labels: dict = None,
                  edge_labels: dict = None,
                  mcd: int = None,
-                 features: List[float] = None) -> None:
+                 features: List[float] = None,
+                 dataset: str = None) -> None:
         self._features = features
         super().__init__(id, name, graph,
                          graph_dgl, graph_label,
-                         node_labels, edge_labels, mcd)
+                         node_labels, edge_labels, mcd, dataset)
 
    
     @property
@@ -41,7 +42,8 @@ class DataInstanceWFeaturesAndWeights(DataInstanceWFeatures):
                  edge_labels: dict = None,
                  mcd: int = None,
                  features: List[float] = None,
-                 weights: List[float] = None) -> None:
+                 weights: List[float] = None,
+                 dataset: str = None) -> None:
         
         self._features = features
         self._weights = weights
@@ -49,7 +51,7 @@ class DataInstanceWFeaturesAndWeights(DataInstanceWFeatures):
         super().__init__(id, name, graph,
                          graph_dgl, graph_label,
                          node_labels, edge_labels,
-                         mcd, features)
+                         mcd, features, dataset)
         
         
     @property

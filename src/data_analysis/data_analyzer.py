@@ -104,28 +104,36 @@ class DataAnalyzer():
             ds = d_fact.get_dataset_by_name(d_dict)
             datasets.append(ds)
 
-        data = {'name': [], 'instance_number': [], 'nodes_mean': [], 'nodes_std':[], 'edges_mean':[], 'edges_std': [], 'inst_class_0':[], 'inst_class_1':[]}
+        data = {'name': [], 'instance_number': [], 'nodes_mean': [], 'nodes_std':[], 'edges_mean':[], 'edges_std': [], 'max_nodes': [], 'mean_degree': [], 'inst_class_0':[], 'inst_class_1':[]}
 
         for dts in datasets:
-            nodes = np.array([len(i.graph.nodes) for i in dts.instances])
-            edges = np.array([len(i.graph.edges) for i in dts.instances])
-
+            nodes = np.array([[len(i.graph.nodes) for i in dataset.instances] for dataset in dts.dynamic_graph.values()])
+            edges = np.array([[len(i.graph.edges) for i in dataset.instances] for dataset in dts.dynamic_graph.values()])
+            degrees = np.array([[np.mean(list(dict(i.graph.degree).values())) for i in dataset.instances] for dataset in dts.dynamic_graph.values()])
+            instance_number = np.array([len(dataset.instances) for dataset in dts.dynamic_graph.values()])
+            
             class_0_count = 0
             class_1_count = 0
-            for i in dts.instances:
+            all_instances = []
+            for dataset in dts.dynamic_graph.values():
+                all_instances += dataset.instances
+            for i in all_instances:
                 if i.graph_label == 0:
                     class_0_count +=1
                 else:
                     class_1_count +=1
+                    
 
-            data['name'].append(dts.name)
-            data['instance_number'].append(len(dts.instances))
+            data['name'].append(dts._name)
+            data['instance_number'].append(np.mean(instance_number))
             data['nodes_mean'].append(np.mean(nodes))
             data['nodes_std'].append(np.std(nodes))
             data['edges_mean'].append(np.mean(edges))
             data['edges_std'].append(np.std(edges))
-            data['inst_class_0'].append(class_0_count)
-            data['inst_class_1'].append(class_1_count)
+            data['max_nodes'].append(np.max(nodes))
+            data['mean_degree'].append(np.mean(degrees))
+            data['inst_class_0'].append(class_0_count / len(dts.dynamic_graph.keys()))
+            data['inst_class_1'].append(class_1_count / len(dts.dynamic_graph.keys()))
 
             table = pd.DataFrame(data)
             table_path_csv = os.path.join(self.output_folder, 'dataset_stats.csv')

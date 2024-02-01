@@ -13,7 +13,8 @@ class DataInstance(ABC):
                  graph_label: int = None,
                  node_labels: dict = None,
                  edge_labels: dict = None,
-                 mcd: int = None) -> None:
+                 mcd: int = None,
+                 dataset: str = None) -> None:
         self._id = id
         self._name = name
         self._graph = graph
@@ -25,6 +26,7 @@ class DataInstance(ABC):
         self._np_array = None
         self._n_node_types = 0
         self._max_n_nodes = 0
+        self.dataset = dataset
         super().__init__()
 
     @property

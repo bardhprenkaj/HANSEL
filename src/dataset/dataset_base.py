@@ -183,7 +183,7 @@ class Dataset(ABC):
         # Iterate over each instance and load them
         for line in f_gnames.readlines():
             print(f'Reading instance with id = {instance_number}')
-            inst = DataInstance(id=instance_number)
+            inst = DataInstance(id=instance_number, dataset=dataset_path[dataset_path.rindex(os.sep)+1:])
             instance_number += 1
 
             # Getting the instance name and storing the path to the instance folder
@@ -257,9 +257,9 @@ class Dataset(ABC):
                     temp.graph = inst.graph
                     temp.graph_dgl = inst.graph_dgl
                     temp.name = inst.name
+                    temp.dataset = inst.dataset
                     
                     temp.features = jsonpickle.decode(features_reader.read())
-                    
                     inst = temp # replace the old object with the new temporary one
 
             result.append(inst)
@@ -319,7 +319,7 @@ class Dataset(ABC):
     
 
     def generate_splits(self, n_splits=10, shuffle=True):
-        kf = KFold(n_splits=n_splits, shuffle=shuffle)
+        kf = KFold(n_splits=n_splits, shuffle=shuffle, random_state=42)
         self.splits = []
         spl = kf.split([i for i in range(0, len(self.instances))], 
             [g.graph_label for g in self.instances])
