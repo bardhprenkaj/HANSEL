@@ -1,5 +1,5 @@
 from abc import ABC
-
+from src.oracle.oracle_custom_bonanza import BonanzaOracle
 from src.dataset.converters.abstract_converter import ConverterAB
 from src.dataset.converters.cf2_converter import CF2TreeCycleConverter
 from src.dataset.converters.weights_converter import \
@@ -128,14 +128,21 @@ class OracleFactory(ABC):
             
         elif oracle_name == 'btc_alpha_oracle':
             return self.get_btc_alpha_oracle(dataset, config_dict=oracle_dict)
-            
+        
+        elif oracle_name == 'bonanza_oracle':
+            return self.get_bonanza_oracle(dataset, config_dict=oracle_dict)
+        
         elif oracle_name == 'id_oracle':
             return self.get_id_oracle()
         # If the oracle name does not match any oracle in the factory
         else:
             raise ValueError('''The provided oracle name does not match any oracle provided by the factory''')
         
-        
+    def get_bonanza_oracle(self, dataset:Dataset, timestamp=-1, config_dict=None):
+        clf = BonanzaOracle(id=self._oracle_id_counter, oracle_store_path=self._oracle_store_path, config_dict=config_dict)
+        self._oracle_id_counter += 1
+        return clf
+    
     def get_btc_alpha_oracle(self, dataset:Dataset, timestamp=-1, config_dict=None):
         clf = BTCAlphaCustomOracle(id=self._oracle_id_counter, oracle_store_path=self._oracle_store_path, config_dict=config_dict)
         self._oracle_id_counter += 1
