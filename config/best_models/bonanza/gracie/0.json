@@ -31,7 +31,7 @@
     ],
     "explainers": [
         {
-            "name": "condgce",
+            "name": "gracie",
             "parameters": { 
                 "epochs_ae": 100,
                 "fold_id": 0,
