@@ -1,0 +1,6 @@
+0 1 {'weight': 5}
+0 4 {'weight': 10}
+1 4 {'weight': 3}
+2 4 {'weight': 5}
+3 4 {'weight': 2}
+4 5 {'weight': 2}
