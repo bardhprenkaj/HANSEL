@@ -1,0 +1,90 @@
+{
+    "store_paths": [
+        {"name": "dataset_store_path", "address": "./data/datasets/"},
+        {"name": "embedder_store_path", "address": "./data/embedders/"},
+        {"name": "oracle_store_path", "address": "./data/oracles/"},
+        {"name": "explainer_store_path", "address": "./data/explainers/BTC_OTC/condgce_gat_decoder"},
+        {"name": "output_store_path", "address": "./output/BTC_OTC"}
+    ],
+    "datasets": [
+        {
+            "name": "btc_otc", 
+            "parameters": {
+                "begin_time": 2011,
+                "end_time": 2015,
+                "filter_min_graphs": 4,
+                "number_of_communities": 4
+            } 
+        }
+    ],
+    "oracles": [
+        {
+            "name": "dynamic_oracle",
+            "parameters": {
+                "base_oracle" : {
+                    "name": "btc_alpha_oracle", 
+                    "parameters": {}
+                },
+                "first_train_timestamp": 2011
+            }
+        }
+    ],
+    "explainers": [
+        {
+            "name": "condgce",
+            "parameters": { 
+                "epochs_ae": 100,
+                "fold_id": 4,
+                "lr": 1e-3,
+                "top_k_cf": 50,
+                "batch_size": 64,
+                "kl_weight": 0.5,
+                "in_dim": 4,
+                "decoder_dims": 2,
+                "replace_rate": 0.1,
+                "mask_rate": 0.3,
+                "encoder": {
+                    "name": "var_gcn_encoder",
+                    "parameters": {
+                        "input_dim": 4,
+                        "out_dim": 2
+                    }
+                },
+                "decoder": {
+                    "name": "gat_decoder",
+                    "parameters": {
+                        "input_dim": 2,
+                        "hidden_dim": 3,
+                        "out_dim": 4,
+                        "num_layers": 2,
+                        "nhead": 16,
+                        "nhead_out": 1,
+                        "negative_slope": 0.2                    
+                    }
+                },
+                "weight_schedulers": [
+                    {
+                        "name": "no_decay",
+                        "parameters" : {
+                            "init_weight": 1
+                        }
+                    },
+                    {
+                        "name": "no_decay",
+                        "parameters": {
+                            "init_weight": 0.5
+                        }
+                    }
+                ]
+            } 
+        }
+    ],
+    "evaluation_metrics": [ 
+        {"name": "graph_edit_distance", "parameters": {}},
+        {"name": "oracle_calls", "parameters": {}},
+        {"name": "correctness", "parameters": {}},
+        {"name": "sparsity", "parameters": {}},
+        {"name": "fidelity", "parameters": {}},
+        {"name": "oracle_accuracy", "parameters": {}}
+    ]
+}
