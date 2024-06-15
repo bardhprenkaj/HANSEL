@@ -20,12 +20,23 @@
 
 ## General Information:
 
-HANSEL is an open source framework for Evaluating Graph Counterfactual Explanation Methods under data changes (i.e. data distribution drifts). Our main goal is to create a generic platform that allows the researchers to speed up the process of developing and testing new Timed-Graph Counterfactual Explanation Methods.
+HANSEL is an open-source framework for Evaluating Graph Counterfactual Explanation Methods under data changes (i.e., data distribution drifts). Our main goal is to create a generic platform that allows the researchers to speed up the process of developing and testing new Timed-Graph Counterfactual Explanation Methods.
 
 
 ## Citation Request:
 
 Please cite our paper if you use HANSEL in your experiments:
+
+Prenkaj, B.; Villaiz ́an-Vallelado, M.; Leemann, T.; and Kasneci, G. 2023. Unifying Evolution, Explanation, and Discernment: A Generative Approach for Dynamic Graph Counterfactuals. In Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining (KDD ’24), August 25–29, 2024, Barcelona, Spain. ACM, New York, NY, USA, 12 pages. https://doi.org/10.1145/3637528.3671831
+
+```latex:
+@inproceedings{prenkaj2024gracie,
+  title={Unifying Evolution, Explanation, and Discernment: A Generative Approach for Dynamic Graph Counterfactuals},
+  author={Bardh Prenkaj and Mario Villaizán-Vallelado and Tobias Leemann and Gjergji Kasneci},
+  booktitle={Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining (KDD ’24)},
+  year={2024}
+}
+```
 
 Prenkaj, B.; Villaiz ́an-Vallelado, M.; Leemann, T.; and Kasneci, G. 2023. Adapting to Change: Robust Counterfactual Explanations in Dynamic Data Landscapes. In Proceedings of The European Conference on Machine Learning and Principles and Practice of Knowledge Discovery (ECML PKDD 2023)
 
@@ -37,6 +48,8 @@ Prenkaj, B.; Villaiz ́an-Vallelado, M.; Leemann, T.; and Kasneci, G. 2023. Adap
   year={2023}
 }
 ```
+
+
 
 ## Requirements:
 
@@ -59,13 +72,13 @@ The easiest way to get HANSEL up and running with all the dependencies is to pul
 docker pull gretel/gretel:latest
 ```
 
-The image is based on `tensorflow/tensorflow:latest-gpu` and it's GPU ready. In order to setup the container we recommend you to run:
+The image is based on `tensorflow/tensorflow:latest-gpu` and it's GPU ready. To set up the container, we recommend you run:
 
 ```
 docker-compose run gretel
 ```
 
-For simplicity we provide several **makefile** rules for easy interaction with the Docker interface:
+For simplicity, we provide several **makefile** rules for easy interaction with the Docker interface:
 
  * `make docker` - builds the development image from scratch
  * `make pull` - pull the development image
@@ -79,6 +92,10 @@ For simplicity we provide several **makefile** rules for easy interaction with t
 * **DynTree-Cycles**: Synthetic data set where each instance is a graph. The instance can be either a tree or a tree with several cycle patterns connected to the main graph by one edge
 
 * **DBLP-Coauthors**: It contains graphs where the vertices represent authors, and the connections are co-authorship relationships between two authors.
+
+* **BTC-Alpha** and **BTC-OTC**: It contains who-trust-whom networks of traderson the Bitcoin Alpha and Bitcoin OTC platforms
+
+* **Bonanza**:  This is similar to eBay and Amazon Marketplace in that users create an account to buy or sell various goods. After a buyer purchases a product from a seller, both can provide a rating about the other along with a short comment.
 
 ### Oracles:
 
@@ -94,13 +111,15 @@ For simplicity we provide several **makefile** rules for easy interaction with t
 
 * **DyGRACE**: Dynamic Graph Counterfactual Explainer, a semi-supervised GCE method that uses two representation learners and a logistic regressor to find valid counterfactuals
 
+* **GRACIE**: Graph Recalibration and Adaptive Counterfactual Inspection and Explanation
+
 ## How to use:
 
-Lets see an small example of how to use the framework.
+Let's see a small example of how to use the framework.
 
 ### Config file
 
-First, we need to create a config json file with the option we want to use in our experiment. In the file config/ECMLPKDD/manager_config_example_dygrace.json it is possible to find all options for each componnent of the framework.
+First, we must create a config JSON file with the option we want to use in our experiment. In the file config/best_models/tree-cycles/gracie/0.json, it is possible to find all options for each component of the framework.
 
 ```json
 {
@@ -139,15 +158,52 @@ First, we need to create a config json file with the option we want to use in ou
     ],
     "explainers": [
         {
-            "name": "dygrace",
+            "name": "gracie",
             "parameters": { 
-                "in_channels": 4,
-                "out_channels": 4,
-                "epochs_ae": 50,
+                "epochs_ae": 200,
                 "fold_id": 0,
                 "lr": 1e-3,
-                "autoencoder_name":"gae",
-                "encoder_name": "gcn_encoder"
+                "top_k_cf": 50,
+                "batch_size": 64,
+                "kl_weight": 0.5,
+                "in_dim": 4,
+                "decoder_dims": 2,
+                "replace_rate": 0.1,
+                "mask_rate": 0.3,
+                "lambda": 0.5,
+                "encoder": {
+                    "name": "var_gcn_encoder",
+                    "parameters": {
+                        "input_dim": 4,
+                        "out_dim": 2
+                    }
+                },
+                "decoder": {
+                    "name": "gat_decoder",
+                    "parameters": {
+                        "input_dim": 2,
+                        "hidden_dim": 3,
+                        "out_dim": 4,
+                        "num_layers": 2,
+                        "nhead": 16,
+                        "nhead_out": 1,
+                        "negative_slope": 0.2                    
+                    }
+                },
+                "weight_schedulers": [
+                    {
+                        "name": "no_decay",
+                        "parameters" : {
+                            "init_weight": 1
+                        }
+                    },
+                    {
+                        "name": "no_decay",
+                        "parameters": {
+                            "init_weight": 0.5
+                        }
+                    }
+                ]
             } 
         }
     ],
@@ -155,8 +211,6 @@ First, we need to create a config json file with the option we want to use in ou
         {"name": "graph_edit_distance", "parameters": {}},
         {"name": "oracle_calls", "parameters": {}},
         {"name": "correctness", "parameters": {}},
-        {"name": "sparsity", "parameters": {}},
-        {"name": "fidelity", "parameters": {}},
         {"name": "oracle_accuracy", "parameters": {}}
     ]
 }
@@ -167,7 +221,7 @@ Then to execute the experiment from the main the code would be something like th
 ```python
 from src.evaluation.dynamic_graphs.dynamic_evaluator_manager import DynamicEvaluatorManager
 
-config_file_path = './config/ECMLPKDD/manager_config_example_dygrace.json'
+config_file_path = './config/best_models/tree-cycles/gracie/0.json'
 
 print('Creating the evaluation manager.......................................................')
 eval_manager = DynamicEvaluatorManager(config_file_path, K=10, run_number=0)
@@ -179,4 +233,4 @@ print('Evaluating the explainers................................................
 eval_manager.evaluate()
 ```
 
-Once the result json files are generated it is possible to use the report_dynamic_stats.py module to generate a json file with the results of the dynamic experiments.
+Once the result JSON files are generated, it is possible to use the report_dynamic_stats.py module to generate a JSON file with the results of the dynamic experiments.
