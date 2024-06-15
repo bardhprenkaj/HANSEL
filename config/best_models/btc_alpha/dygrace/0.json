@@ -35,7 +35,8 @@
             "parameters": { 
                 "in_channels": 4,
                 "out_channels": 4,
-                "epochs_ae": 20,
+                "epochs_ae": 10,
+                "batch_size": 4,
                 "fold_id": 0,
                 "lr": 1e-2,
                 "encoder": {
