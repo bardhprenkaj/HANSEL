@@ -18,11 +18,12 @@ if __name__ == '__main__':
     output_folder = sys.argv[1]
     k = int(sys.argv[2])
     
-    metrics = [GraphEditDistanceMetric(), OracleAccuracyMetric(), SparsityMetric(), FidelityMetric(), CorrectnessMetric()]
+    metrics = [GraphEditDistanceMetric(), CorrectnessMetric()]
     
     if os.path.exists(output_folder):
         files = [x[0] for x in os.walk(output_folder)][1:]
         df = pd.DataFrame(files, columns=['out_path'])
+        print(df)
         df['year'] = df.out_path.apply(lambda path : re.findall('(\d{4})', path)[0])
         
         report = {year: {f'{metric._name}@{i}': [] for i in range(1,k+1) for metric in metrics}  for year in df.year.unique()}
@@ -37,10 +38,16 @@ if __name__ == '__main__':
                     for i in range(1, k+1):
                         for metric in metrics:
                             curr_metric = reports.get(f'{metric._name}@{i}', [])
-                            if f'{metric._name}'.lower() in ['graph_edit_distance', 'sparsity']:
-                                curr_metric = np.mean(curr_metric, axis=1).tolist()
+                            if f'{metric._name}'.lower() in ['graph_edit_distance']:
+                                elemns = []
+                                for elem in curr_metric:
+                                    if type(elem) == list:
+                                        elemns += elem
+                                    else:
+                                        elemns.append(elem)
+                                curr_metric = elemns
                             if type(curr_metric) == list:
-                                report[group[0]][f'{metric._name}@{i}'].append(curr_metric)
+                                report[group[0]][f'{metric._name}@{i}'] += curr_metric
                             else:
                                 report[group[0]][f'{metric._name}@{i}'].append([float(curr_metric)] * len(report[group[0]][f'{metric._name}@{i}']))
                             
@@ -52,7 +59,13 @@ if __name__ == '__main__':
         
         for year in report.keys():
             for metric in report[year]:
-                report[year][metric] = np.mean(report[year][metric], axis=0)
+                elemns = []
+                for elem in report[year][metric]:
+                    if type(elem) == list:
+                        elemns += elem
+                    else:
+                        elemns.append(elem)
+                report[year][metric] = elemns
                 report[year][metric] = f'{np.mean(report[year][metric]):.2f}\\pm {np.std(report[year][metric]):.3f}'
              
             if type(report[year]['runtime']) != str:
