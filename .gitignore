@@ -2,8 +2,15 @@
 __pycache__/
 *.py[cod]
 *$py.class
-*.json
 *.svg
+*.json
+*.edgelist
+*graph_label*
+*node_label*
+*mcd*
+*adjlist*
+*.txt
+*.csv
 # C extensions
 *.so
 
