@@ -123,7 +123,7 @@ class Bonanza(DynamicDataset):
         for t in range(max(self.begin_t, min(temporal_graph.keys())), min(self.end_t, max(temporal_graph.keys()))+1):
             instance_id = 0
             nodes = list(temporal_graph[t].nodes)
-            for node in nodes[:500]:#len(nodes) * .05)]:
+            for node in nodes[:100]:#len(nodes) * .05)]:
                 subgraph = nx.ego_graph(temporal_graph[t], node, undirected=True)
                 self.__create_data_instance(id=instance_id, graph=subgraph,
                                             year=t, label=self.__get_label(subgraph))

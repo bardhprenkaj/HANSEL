@@ -49,31 +49,32 @@ class DyGRACE(Explainer):
         self.explainer_store_path = explainer_store_path
         self.EPS = 20
         self.K = top_k_cf
+        self._fitted = False
 
 
     def explain(self, instance, oracle: Oracle, dataset: Dataset):
-        explainer_name = f'{self.__class__.__name__}_fit_on_{dataset.name}_fold_id_{self.fold_id}'
-        self.explainer_uri = os.path.join(self.explainer_store_path, explainer_name)
-        self.name = explainer_name
-        
-        # train using the oracle only in the first iteration
-        if self.iteration == 0:        
-            self.fit(oracle, dataset, self.fold_id)
-        ########################################
-        # inference
-        data_loaders = self.transform_data(oracle, dataset, index_label=True, use_oracle=False)
-        df = pd.DataFrame(columns=['rec_cf', 'rec_f', 'sim', 'instance'])
-
-        for data_loader in data_loaders:
-            rows = self.__inference_table(data_loader=data_loader,
-                                          dataset=dataset,
-                                          search_for_instance=instance)
-            df = pd.concat([df, pd.DataFrame(rows)])
-                
-        df.rec_cf *= -1
         try:
-            y_pred = self.contrastive_learner.predict(df.values[:,:-1])
+            explainer_name = f'{self.__class__.__name__}_fit_on_{dataset.name}_fold_id_{self.fold_id}'
+            self.explainer_uri = os.path.join(self.explainer_store_path, explainer_name)
+            self.name = explainer_name
             
+            # train using the oracle only in the first iteration
+            if self.iteration == 0 and not self._fitted:        
+                self.fit(oracle, dataset, self.fold_id)
+            ########################################
+            # inference
+            data_loaders = self.transform_data(oracle, dataset, index_label=True, use_oracle=False)
+            df = pd.DataFrame(columns=['rec_cf', 'rec_f', 'sim', 'instance'])
+
+            for data_loader in data_loaders:
+                rows = self.__inference_table(data_loader=data_loader,
+                                            dataset=dataset,
+                                            search_for_instance=instance)
+                df = pd.concat([df, pd.DataFrame(rows)])
+                    
+            df.rec_cf *= -1
+            y_pred = self.contrastive_learner.predict(df.values[:,:-1])
+                
             factuals = np.where(y_pred == 0)[0]
             factuals = self.__sample_k(dataset, df) if len(factuals) else [instance]
             
@@ -85,9 +86,9 @@ class DyGRACE(Explainer):
                             deepcopy(counterfactuals),
                             deepcopy(factuals),
                             oracle)
-        except ValueError:
+        except (ValueError, IndexError, Exception):
             # the logistic regressor / AEs don't find any counterfactual
-            counterfactuals = [instance]            
+            counterfactuals = [instance]          
 
         return counterfactuals
         
@@ -334,14 +335,18 @@ class DyGRACE(Explainer):
         data = {}
         split_indices = {label: [] for label in range(self.num_classes)}
         for i in indices:
-            instance = dataset.get_instance(i)
-            if use_oracle:
-                split_indices[oracle.predict(instance)].append(i)
-            else:
-                split_indices[instance.graph_label].append(i)
-            # transform the entire dataset into torch geometric Data objects
-            data[i] = self.__to_geometric(instance, label=int(i))
-            
+            try:
+                instance = dataset.get_instance(i)
+                if instance:
+                    if use_oracle:
+                        split_indices[oracle.predict(instance)].append(i)
+                    else:
+                        split_indices[instance.graph_label].append(i)
+                    # transform the entire dataset into torch geometric Data objects
+                    data[i] = self.__to_geometric(instance, label=int(i))
+            except IndexError:
+                continue
+                        
         class_indices = sorted(list(split_indices.values()))
         # generate positive and negative samples
         combos = list(product(*class_indices))

@@ -30,7 +30,8 @@ class EvaluationMetricFactory:
             return self.get_sparsity_metric(config_dict=metric_dict)
 
         elif metric_name == 'correctness':
-            return self.get_correctness_metric(config_dict=metric_dict)
+            dump = metric_dict.get('dump', False)
+            return self.get_correctness_metric(dump=dump, config_dict=metric_dict)
 
         elif metric_name == 'fidelity':
             return self.get_fidelity_metric(config_dict=metric_dict)
@@ -51,8 +52,8 @@ class EvaluationMetricFactory:
             raise ValueError('''The provided evaluation metric name does not match any evaluation
              metric provided by the factory''')
 
-    def get_correctness_metric(self, config_dict=None) -> EvaluationMetric:
-        result = CorrectnessMetric(config_dict)
+    def get_correctness_metric(self, dump=False, config_dict=None) -> EvaluationMetric:
+        result = CorrectnessMetric(dump=dump, config_dict=config_dict)
         return result
 
 

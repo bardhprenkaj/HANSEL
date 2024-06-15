@@ -51,7 +51,8 @@ class MEGExplainer(Explainer):
         self.k = k       
 
     def explain(self, instance: DataInstance, oracle: Oracle, dataset: Dataset):
-        num_input = len(instance.to_numpy_array()) ** 2
+
+        num_input = len(instance.to_numpy_array()) ** 2 + 1
         self.explainer = MEGAgent(num_input=num_input,
                                 num_output=1,
                                 lr=self.lr,
@@ -62,6 +63,7 @@ class MEGExplainer(Explainer):
         with torch.no_grad():
             counterfactuals = self.cf_queue.slice(self.k)
             return [cf_inst['next_state'] for cf_inst in counterfactuals]
+        
 
 
     def save_explainers(self):

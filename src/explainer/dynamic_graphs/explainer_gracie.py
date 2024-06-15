@@ -15,18 +15,15 @@ from src.dataset.dataset_base import Dataset
 from src.dataset.torch_geometric.dataset_geometric import TorchGeometricDataset
 from src.explainer.explainer_base import Explainer
 from src.oracle.oracle_base import Oracle
-from src.utils.weight_schedulers import WeightScheduler
 from torch_geometric.nn.pool import global_mean_pool
 
 
-class ConDGCE(Explainer):
+class GRACIE(Explainer):
     
     def __init__(self,
                  id: int,
                  explainer_store_path: str,
                  autoencoders: List[torch.nn.Module],
-                 alpha_scheduler: WeightScheduler,
-                 beta_scheduler: WeightScheduler,
                  fold_id: int = 0,
                  batch_size: int = 24,
                  lr: float = 1e-4,
@@ -46,7 +43,6 @@ class ConDGCE(Explainer):
         self.autoencoders = autoencoders
         self.k = k
         self.lam = lam
-        self.alpha_scheduler, self.beta_scheduler = alpha_scheduler, beta_scheduler
         self.optimizers = [
             torch.optim.Adam(autoencoder.parameters(), lr=self.lr) for autoencoder in self.autoencoders
         ]
@@ -63,9 +59,7 @@ class ConDGCE(Explainer):
         
     def explain(self, instance, oracle: Oracle, dataset: Dataset):
         explainer_name = f'{self.__class__.__name__}_fit_on_{dataset.name}_fold_id_{self.fold_id}'\
-            + f'_batch={self.batch_size}_lr={self.lr}_e={self.epochs}_k={self.k}_lam={self.lam}'\
-                    + f'_alpha={self.alpha_scheduler.__class__.__name__}'\
-                        + f'_beta={self.beta_scheduler.__class__.__name__}'
+            + f'_batch={self.batch_size}_lr={self.lr}_e={self.epochs}_k={self.k}_lam={self.lam}'
                         
         self.explainer_uri = os.path.join(self.explainer_store_path, explainer_name)
         self.name = explainer_name
@@ -249,18 +243,12 @@ class ConDGCE(Explainer):
                     loss = feature_rec_loss + dist_loss + edge_rec_loss
                     loss.backward()
                     self.optimizers[cls].step()
-                    
+                                        
                     mse_losses.append(edge_rec_loss.item())
                     feature_rec_losses.append(feature_rec_loss.item())
                     dist_losses.append(dist_loss.item())
 
                 print(f'Class {cls}, Epoch = {epoch} ----> Feature rec loss = {np.mean(feature_rec_losses): .4f}, Dist loss = {np.mean(dist_losses)}, Edge rec loss = {np.mean(mse_losses)}')
-            """if self.wandb_optimize:
-                wandb.log({
-                    f'rec_loss_{cls}_{self.fold_id}': np.mean(rec_losses[epoch]),
-                    f'contrastive_loss_{cls}_{self.fold_id}': np.mean(contrastive_losses),
-                    f'epoch_{cls}_{self.fold_id}': epoch,
-                })"""    
     
     def save_autoencoder(self, model: torch.nn.Module, cls: int):
         """
@@ -309,7 +297,6 @@ class ConDGCE(Explainer):
             
         
     def update(self):
-        print(self.next_iteration_classifications)
         # update the priors of selecting the autoencoders
         counts = Counter(self.next_iteration_classifications)
         all_elems = sum(list(counts.values()))

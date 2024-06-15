@@ -76,7 +76,7 @@ class CustomVGAE(VGAE, AutoEncoder):
         neg_loss = 0
         if num_edges != (num_nodes * (num_nodes - 1)):
             if neg_edge_index is None:
-                neg_edge_index = negative_sampling(pos_edge_index, z.size(0))
+                neg_edge_index = negative_sampling(pos_edge_index, z.size(0)).type(torch.int64)
             neg_loss = -torch.log(1 - self.decoder.decode(z, neg_edge_index, **{'edge_attr': None,'sigmoid': True}) + 1e-15).mean()
         return pos_loss + neg_loss
  
@@ -147,4 +147,23 @@ class ContrastiveGAE(GAE, AutoEncoder):
         return self.mse(rec_g1, gt), self.contrastive_loss(g1_repr, g2_repr, labels)
 
         
+class CustomCNNVAE(AutoEncoder, nn.Module):
+    
+    def __init__(self, encoder: nn.Module, decoder: Optional[nn.Module] = None):
+        super().__init__()
         
+        self.encoder = encoder
+        self.decoder = decoder
+                
+    def forward(self, x):
+        return self.decoder(self.encoder(x))
+    
+    def encode(self, x):
+        return self.encoder(x)
+        
+    def loss(self, recon: Tensor, truth, **kwargs):
+        kwargs = SimpleNamespace(**kwargs)
+        BCE = torch.mean((recon - truth)**2)
+        # Kullback-Leibler divergence
+        KLD = -0.5 * torch.sum(1 + kwargs.logvar - kwargs.mu.pow(2) - kwargs.logvar.exp())
+        return BCE + KLD

@@ -1,4 +1,5 @@
 from typing import List
+from src.explainer.dynamic_graphs.contrastive_models.explainer_condgce_cnn import CNNConDGCE
 
 import torch
 
@@ -440,9 +441,93 @@ class ExplainerFactory:
                                     fold_id=fold_id,
                                     lam=lam,
                                     config_dict=explainer_dict)
+            
+        elif explainer_name == 'condgce_cnn':
+            if 'weight_schedulers' not in explainer_parameters:
+                raise ValueError('''ConDGCECNN needs to have the weight schedulers specified''')
+            if 'decoder' not in explainer_parameters:
+                raise ValueError('''ConDGCECNN needs to have a decoder specified''')
+            if 'encoder' not in explainer_parameters:
+                raise ValueError('''ConDGCECNN needs to have an encoder specified''')
+            #########################################################################
+            # encoder parameters
+            encoder = explainer_parameters['encoder']
+            encoder_name = encoder.get('name', 'cnn_encoder')
+            if 'parameters' not in encoder:
+                raise ValueError('''The encoder of ConDGCECNN needs to have parameters, even if they're empty''')
+            encoder_params = encoder['parameters']
+            #########################################################################
+            # decoder parameters
+            decoder = explainer_parameters['decoder']
+            decoder_name = decoder.get('name', None)
+            if 'parameters' not in decoder:
+                raise ValueError('''The decoder of ConDGCECNN needs to have parameters, even if they're empty''')
+            decoder_params = decoder['parameters']
+            ########################################################################            
+            schedulers = explainer_parameters['weight_schedulers']
+            # we only need two weight schedulers
+            assert(len(schedulers) == 2)
+            
+            fold_id = explainer_parameters.get('fold_id', 0)
+            num_classes = explainer_parameters.get('num_classes', 2)
+            batch_size = explainer_parameters.get('batch_size', 24)
+            lr = explainer_parameters.get('lr', 1e-3)
+            epochs_ae = explainer_parameters.get('epochs_ae', 100)
+            top_k_cf = explainer_parameters.get('top_k_cf', 10)
+            in_dim = explainer_parameters.get('in_dim', 4)
+            replace_rate = explainer_parameters.get('replace_rate', .1)
+            mask_rate = explainer_parameters.get('mask_rate', .3)
+            lam = explainer_parameters.get('lam', .5)
+                        
+            encoder = self._autoencoder_factory.get_encoder(encoder_name, **encoder_params)
+            decoder = self._autoencoder_factory.get_decoder(decoder_name, **decoder_params)
+            
+            kwargs = {'input_dim': in_dim, 'decoder_dims': decoder.input_dim, 'replace_rate': replace_rate, 'mask_rate': mask_rate}
+            
+            autoencoders = self._autoencoder_factory.init_autoencoders('cnn_vae', encoder, decoder, num_classes, **kwargs)
+            
+            schedulers = tuple([self._weight_scheduler_factory.get_scheduler_by_name(weight_dict) for weight_dict in schedulers])
+            alpha_scheduler, beta_scheduler = schedulers
+               
+            return self.get_condgce_cnn(autoencoders=autoencoders,
+                                    alpha_scheduler=alpha_scheduler,
+                                    beta_scheduler=beta_scheduler,
+                                    batch_size=batch_size,
+                                    epochs=epochs_ae,
+                                    lr=lr,
+                                    k=top_k_cf,
+                                    fold_id=fold_id,
+                                    lam=lam,
+                                    config_dict=explainer_dict)
         else:
             raise ValueError('''The provided explainer name does not match any explainer provided 
             by the factory''')
+            
+            
+    def get_condgce_cnn(self,
+                    autoencoders: List[torch.nn.Module],
+                    alpha_scheduler: WeightScheduler,
+                    beta_scheduler: WeightScheduler,
+                    batch_size: int = 8,
+                    epochs: int = 100,
+                    lr: float = 1e-3,
+                    k: int = 10,
+                    fold_id: int = 0,
+                    lam: int = .5,
+                    config_dict = None) -> Explainer:
+        
+        result = CNNConDGCE(id=self._explainer_id_counter,
+                     explainer_store_path=self._explainer_store_path,
+                     autoencoders=autoencoders,
+                     alpha_scheduler=alpha_scheduler,
+                     beta_scheduler=beta_scheduler,
+                     batch_size=batch_size,
+                     epochs=epochs, lam=lam,
+                     lr=lr, k=k, fold_id=fold_id,
+                     config_dict=config_dict)
+        
+        self._explainer_id_counter += 1
+        return result 
             
     def get_condgce(self,
                     autoencoders: List[torch.nn.Module],

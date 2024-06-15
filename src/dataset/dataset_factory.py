@@ -214,7 +214,7 @@ class DatasetFactory():
             
             begin_time = params_dict['begin_time']
             end_time = params_dict['end_time']
-            padd = params_dict.get('padd', False)
+            pad = params_dict.get('pad', False)
 
             
             assert (begin_time <= end_time)
@@ -224,17 +224,18 @@ class DatasetFactory():
             return self.get_bonanza(begin_time=begin_time,
                                     end_time=end_time,
                                     filter_min_graphs=filter_min_graphs,
-                                    padd=padd)
+                                    padding=pad)
         # If the dataset name does not match any of the datasets provided by the factory
         else:
             raise ValueError('''The provided dataset name is not valid. Valid names include: tree-cycles,
              tree-cycles-balanced, tree-cycles-dummy''')
             
-    def get_bonanza(self, begin_time, end_time, filter_min_graphs, dataset_dict=None, padd=False):
+    def get_bonanza(self, begin_time, end_time, filter_min_graphs, dataset_dict=None, padding=False):
         result = Bonanza(id=self._dataset_id_counter,
                           begin_t=begin_time,
                           end_t=end_time,
                           filter_min_graphs=filter_min_graphs,
+                          padding=padding,
                           config_dict=dataset_dict)
         
         self._dataset_id_counter += 1
@@ -249,7 +250,7 @@ class DatasetFactory():
             result.load_or_generate_splits(os.path.join(self._data_store_path, 'dynamic_graphs', 'bonanza'),
                                            n_splits=10, shuffle=True)
             result.write_datasets(ds_uri)
-        if padd:
+        if padding:
             max_nodes = max([instance.graph.number_of_nodes() for graph in result.dynamic_graph.values() for instance in graph.instances])
             result = self.pad_matrices(result, max_nodes)
             
