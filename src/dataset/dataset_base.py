@@ -1,5 +1,3 @@
-from typing_extensions import Self
-
 from sqlalchemy import false
 from src.dataset.data_instance_features import DataInstanceWFeatures
 from src.dataset.data_instance_base import DataInstance
@@ -13,8 +11,6 @@ import networkx as nx
 from sklearn.model_selection import KFold
 
 import torch as th
-import dgl
-from dgl.data.utils import save_graphs, load_graphs
 
 import numpy as np
 
@@ -89,14 +85,10 @@ class Dataset(ABC):
             with open(os.path.join(dataset_path, 'dataset_id.json'), 'w') as ds_id_writer:
                 ds_id_writer.write(jsonpickle.encode(self._id))
 
-        # Creating a file to contain the name of each instance
-        f_gnames = open(os.path.join(dataset_path, 'graph_names.txt'), 'a')
-
         # Saving each instance
         for i in self.instances:
             # Writing the name of the instance into graph_names.txt
             i_name = i.name
-            f_gnames.writelines(i_name + '\n')
 
             # Creating a folder to contain the files associated with the instance
             i_path = os.path.join(dataset_path, i_name)
@@ -112,12 +104,6 @@ class Dataset(ABC):
                 # Writing the instance graph into adj_matrix format
                 i_graph_path = os.path.join(i_path, i_name + '_graph.adjlist')
                 nx.write_multiline_adjlist(i.graph, i_graph_path)
-
-            elif graph_format == 'dgl':
-                # Write the dgl graph into file
-                if i.graph_dgl is not None:
-                    i_graph_path = os.path.join(i_path, i_name + '_graph_dgl.bin')
-                    save_graphs(i_graph_path, [i.graph_dgl], {"labels" : th.Tensor([i.graph_label])})
             else:
                 raise ValueError('The chosen graph format is not supported')
 
@@ -151,8 +137,6 @@ class Dataset(ABC):
             with open(os.path.join(i_path, i_name + '_splits.json'), 'w') as split_writer:
                 split_writer.write(jsonpickle.encode(self.splits))
 
-        f_gnames.close()
-
     def read_data(self, dataset_path, graph_format='edge_list'):
         """Reads the dataset from files inside a given folder
         -------------
@@ -163,57 +147,40 @@ class Dataset(ABC):
             A list of instances (dictionaries) containing the graphs, labels, and 
             minimum counterfactual distance
         """
-
-        # Reading the name of the dataset from file
-        with open(os.path.join(dataset_path, 'dataset_name.txt'), 'r') as ds_name_reader:
-            self._name = ds_name_reader.read()
-
         # Reading the id of the dataset from file
         dataset_id_uri = os.path.join(dataset_path, 'dataset_id.json')
         if os.path.exists(dataset_id_uri):
             with open(dataset_id_uri, 'r') as ds_id_reader:
                 str_id = jsonpickle.decode(ds_id_reader.read())
                 self._id = str_id
+                self._name = str_id
 
         # Reading the file containing the name of each instance
-        f_gnames = open(os.path.join(dataset_path, 'graph_names.txt'), 'r')
-
+        graph_dirs = [name for name in os.listdir(dataset_path) if os.path.isdir(os.path.join(dataset_path,name))]
         result = []
-        instance_number = 0
         # Iterate over each instance and load them
-        for line in f_gnames.readlines():
-            print(f'Reading instance with id = {instance_number}')
-            inst = DataInstance(id=instance_number, dataset=dataset_path[dataset_path.rindex(os.sep)+1:])
-            instance_number += 1
-
-            # Getting the instance name and storing the path to the instance folder
-            i_name = str.strip(line, '\n')
-            inst.name = i_name
-            i_path = os.path.join(dataset_path, i_name)
+        for _id, graph in enumerate(graph_dirs):
+            print(f'Reading instance with id={_id}, name={graph}')
+            instance_name = graph
+            inst = DataInstance(id=_id, name=graph)
 
             if graph_format == 'edge_list':
                 # Reading the graph from the edgelist
-                i_path_graph = os.path.join(i_path, i_name + '_graph.edgelist')
+                i_path_graph = os.path.join(dataset_path, graph, graph + '_graph.edgelist')
                 # If this line is removed the keys of the nodes are casted to str
                 g = nx.read_edgelist(i_path_graph, nodetype=int)
                 inst.graph = g
             elif graph_format == 'adj_matrix':
                 # Reading the graph from the edgelist
-                i_path_graph = os.path.join(i_path, i_name + '_graph.adjlist')
+                i_path_graph = os.path.join(dataset_path, graph, graph + '_graph.adjlist')
                 # If this line is removed the keys of the nodes are casted to str
                 g = nx.read_multiline_adjlist(i_path_graph, nodetype=int)
                 inst.graph = g
-            elif graph_format == 'dgl':
-                # Reading the graph from the dgl dump
-                i_path_graph = os.path.join(i_path, i_name + '_graph_dgl.bin')
-                g = load_graphs(i_path_graph)[0]
-                inst.graph_dgl = g
-                inst.graph = dgl.to_networkx(g)
             else:
                 raise ValueError('The chosen graph format is not supported')
 
             # Reading the node labels from json file
-            node_labels_uri = os.path.join(i_path, i_name + '_node_labels.json')
+            node_labels_uri = os.path.join(dataset_path, graph, graph + '_node_labels.json')
             if os.path.exists(node_labels_uri):
                 with open(node_labels_uri, 'r') as node_labels_reader:
                     str_dict = jsonpickle.decode(node_labels_reader.read())
@@ -223,7 +190,7 @@ class Dataset(ABC):
                     inst.node_labels = node_labels
 
             # Reading the edge labels from json file
-            edge_labels_uri = os.path.join(i_path, i_name + '_edge_labels.json')
+            edge_labels_uri = os.path.join(dataset_path, graph, graph + '_edge_labels.json')
             if os.path.exists(edge_labels_uri):
                 with open(edge_labels_uri, 'r') as edge_labels_reader:
                     str_dict = jsonpickle.decode(edge_labels_reader.read())
@@ -233,19 +200,19 @@ class Dataset(ABC):
                     inst.edge_labels = edge_labels
 
                     # Reading the graph label from json file
-            graph_label_uri = os.path.join(i_path, i_name + '_graph_label.json')
+            graph_label_uri = os.path.join(dataset_path, graph, graph + '_graph_label.json')
             if os.path.exists(graph_label_uri):
                 with open(graph_label_uri, 'r') as graph_label_reader:
                     inst.graph_label = jsonpickle.decode(graph_label_reader.read())
 
             # Reading the minimum counterfactual distance from json file
-            mcd_uri = os.path.join(i_path, i_name + '_mcd.json')
+            mcd_uri = os.path.join(dataset_path, graph, graph + '_mcd.json')
             if os.path.exists(mcd_uri):
                 with open(mcd_uri, 'r') as mcd_reader:
                     inst.minimum_counterfactual_distance = jsonpickle.decode(mcd_reader.read())
             
             # Reading the features from json file
-            features_uri = os.path.join(i_path, i_name + '_features.json')
+            features_uri = os.path.join(dataset_path, graph, graph + '_features.json')
             if os.path.exists(features_uri):
                 with open(features_uri, 'r') as features_reader:
                     # copy the previous data instance into this new object
@@ -255,23 +222,20 @@ class Dataset(ABC):
                     temp.edge_labels = inst.edge_labels
                     temp.node_labels = inst.node_labels
                     temp.graph = inst.graph
-                    temp.graph_dgl = inst.graph_dgl
                     temp.name = inst.name
                     temp.dataset = inst.dataset
-                    
                     temp.features = jsonpickle.decode(features_reader.read())
                     inst = temp # replace the old object with the new temporary one
 
             result.append(inst)
 
         # Reading the splits of the dataset
-        splits_uri = os.path.join(i_path, i_name + '_splits.json')
+        splits_uri = os.path.join(dataset_path, 'splits.json')
         if os.path.exists(splits_uri):
             with open(splits_uri, 'r') as split_reader:
                 sp = jsonpickle.decode(split_reader.read())
                 self.splits = sp
 
-        f_gnames.close()
         self.instances = result
 
     def get_data(self):

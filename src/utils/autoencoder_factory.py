@@ -4,8 +4,6 @@ from typing import List
 import torch
 import torch.nn as nn
 
-from src.explainer.dynamic_graphs.contrastive_models.siamese_modules import \
-    DenseSiamese
 from src.utils.autoencoders import ContrastiveGAE, CustomGAE, CustomVGAE
 from src.utils.decoders import SimpleLinearDecoder, GATDecoder
 from src.utils.encoders import GCNEncoder, GraphSAGE, VariationalGCNEncoder

@@ -4,9 +4,6 @@ from src.dataset.dataset_base import Dataset
 import numpy as np
 import networkx as nx
 from typing import List
-from karateclub.estimator import Estimator
-from gensim.models.doc2vec import Doc2Vec, TaggedDocument
-from karateclub.utils.treefeatures import WeisfeilerLehmanHashing
 from rdkit import Chem
 from rdkit.Chem import RDKFingerprint
 from rdkit.Chem import rdMolDescriptors

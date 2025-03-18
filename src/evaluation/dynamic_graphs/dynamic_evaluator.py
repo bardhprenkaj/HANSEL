@@ -5,6 +5,7 @@ from src.oracle.oracle_base import Oracle
 from src.evaluation.evaluator_base import Evaluator
 from copy import deepcopy
 import numpy as np
+
 class DynamicEvaluator(Evaluator):
     
     def __init__(self,

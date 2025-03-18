@@ -51,8 +51,11 @@ class NodeDataset(Dataset):
 
     def read_data(self, dataset_path):
         # Reading the name of the dataset from file
-        with open(os.path.join(dataset_path, 'dataset_name.txt'), 'r') as ds_name_reader:
-            self._name = ds_name_reader.read()
+        try:
+            with open(os.path.join(dataset_path, 'dataset_name.txt'), 'r') as ds_name_reader:
+                self._name = ds_name_reader.read()
+        except:
+            self._name = "NoNameFound"
 
         # Reading the id of the dataset from file
         dataset_id_uri = os.path.join(dataset_path, 'dataset_id.json')

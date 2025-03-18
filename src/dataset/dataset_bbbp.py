@@ -9,7 +9,6 @@ from rdkit.Chem import Draw
 from rdkit.Chem import RDKFingerprint
 from rdkit.Chem import rdMolDescriptors
 import pandas as pd
-import exmol
 
 class BBBPDataset(MolecularDataSet):
     """

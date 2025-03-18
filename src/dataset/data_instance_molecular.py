@@ -10,7 +10,6 @@ import random
 from rdkit import Chem  # type: ignore
 from rdkit.Chem import MolFromSmiles as smi2mol  # type: ignore
 from rdkit.Chem import MolToSmiles as mol2smi  # type: ignore
-import exmol
 
 class MolecularDataInstance(DataInstance):
 

@@ -144,8 +144,11 @@ class MolecularDataSet(Dataset):
         """
 
         # Reading the name of the dataset from file
-        with open(os.path.join(dataset_path, 'dataset_name.txt'), 'r') as ds_name_reader:
-            self._name = ds_name_reader.read()
+        try:
+            with open(os.path.join(dataset_path, 'dataset_name.txt'), 'r') as ds_name_reader:
+                self._name = ds_name_reader.read()
+        except:
+            self._name = "NoNameFound"
 
         # Reading the number of different atoms in the dataset from file
         with open(os.path.join(dataset_path, 'natoms.json'), 'r') as natoms_reader:

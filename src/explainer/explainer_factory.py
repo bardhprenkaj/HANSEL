@@ -144,8 +144,6 @@ class ExplainerFactory:
         result = GRACIE(id=self._explainer_id_counter,
                      explainer_store_path=self._explainer_store_path,
                      autoencoders=autoencoders,
-                     alpha_scheduler=alpha_scheduler,
-                     beta_scheduler=beta_scheduler,
                      batch_size=batch_size,
                      epochs=epochs, lam=lam,
                      lr=lr, k=k, fold_id=fold_id,

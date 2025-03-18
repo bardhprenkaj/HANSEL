@@ -1,7 +1,6 @@
 from abc import ABC
 from src.oracle.oracle_custom_bonanza import BonanzaOracle
 from src.dataset.converters.abstract_converter import ConverterAB
-from src.dataset.converters.cf2_converter import CF2TreeCycleConverter
 from src.dataset.converters.weights_converter import \
     DefaultFeatureAndWeightConverter
 from src.dataset.dataset_base import Dataset
@@ -11,13 +10,10 @@ from src.oracle.embedder_factory import EmbedderFactory
 from src.oracle.embedder_graph2vec import Graph2vec
 from src.oracle.oracle_asd_custom import ASDCustomOracle
 from src.oracle.oracle_base import Oracle
-from src.oracle.oracle_cf2 import CF2Oracle
 from src.oracle.oracle_custom_btc_alpha import BTCAlphaCustomOracle
 from src.oracle.oracle_custom_dblp import DBLPCoAuthorshipCustomOracle
 from src.oracle.oracle_id import IDOracle
 from src.oracle.oracle_knn import KnnOracle
-from src.oracle.oracle_node_pt import NodeOracle
-from src.oracle.oracle_node_syn_pt import SynNodeOracle
 from src.oracle.oracle_svm import SvmOracle
 from src.oracle.oracle_tree_cycles_custom import TreeCyclesCustomOracle
 from src.oracle.oracle_triangles_squares_custom import \
@@ -178,24 +174,6 @@ class OracleFactory(ABC):
         self._oracle_id_counter +=1
         return clf
 
-    def get_cf2(self, dataset: Dataset, converter: ConverterAB, in_dim: int, h_dim: int, lr: float,
-                weight_decay: float, epochs: int, batch_size_ratio: float, threshold: float, 
-                fold_id: int, config_dict=None) -> Oracle:
-        clf = CF2Oracle(id=self._oracle_id_counter,
-                        oracle_store_path=self._oracle_store_path,
-                        converter=converter,
-                        in_dim=in_dim,
-                        h_dim=h_dim,
-                        lr=lr,
-                        weight_decay=weight_decay,
-                        epochs=epochs,
-                        threshold=threshold,
-                        batch_size_ratio=batch_size_ratio,
-                        fold_id=fold_id,
-                        config_dict=config_dict)
-        self._oracle_id_counter += 1
-        clf.fit(dataset, split_i=fold_id)
-        return clf
 
     def get_knn(self, data: Dataset, embedder: Embedder, k, split_index=-1, config_dict=None) -> Oracle:
         embedder.fit(data)
